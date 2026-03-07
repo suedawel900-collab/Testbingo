@@ -199,7 +199,12 @@ def approve_transaction(tx_id, admin_id):
               (admin_id, datetime.now(), tx_id))
     
     c.execute("SELECT user_id, amount FROM transactions WHERE tx_id = ?", (tx_id,))
-    user_id, amount = c.fetchone()
+    result = c.fetchone()
+    if not result:
+        conn.close()
+        return None, None
+    
+    user_id, amount = result
     
     c.execute("UPDATE users SET balance = balance + ?, total_deposits = total_deposits + ? WHERE id = ?",
               (amount, amount, user_id))
@@ -241,7 +246,6 @@ def update_game_settings(admin_id, settings):
     conn.commit()
     conn.close()
     
-    # Log admin action
     log_admin_action(admin_id, 'update_settings', json.dumps(settings))
 
 def get_pending_transactions():
@@ -305,7 +309,9 @@ def get_game_stats():
     
     # Total transactions
     c.execute("SELECT COUNT(*), SUM(amount) FROM transactions WHERE status = 'approved'")
-    tx_count, tx_total = c.fetchone()
+    row = c.fetchone()
+    tx_count = row[0] or 0
+    tx_total = row[1] or 0
     
     # Total games played
     c.execute("SELECT SUM(games_played) FROM users")
@@ -319,8 +325,8 @@ def get_game_stats():
     
     return {
         'total_users': total_users,
-        'total_transactions': tx_count or 0,
-        'total_deposits': tx_total or 0,
+        'total_transactions': tx_count,
+        'total_deposits': tx_total,
         'total_games': total_games,
         'active_games': active_games
     }
@@ -424,12 +430,21 @@ def run_bot_process():
         if not db_user:
             bot_create_user(user.id, user.username, user.first_name)
             db_user = bot_get_user(user.id)
+            
+            # If still None, something went wrong
+            if not db_user:
+                await update.message.reply_text("❌ Error creating user. Please try again.")
+                return
         
-        # Check if admin
-        is_admin = db_user[9] == 1
+        # Check if admin - safely access tuple
+        is_admin = False
+        if db_user and len(db_user) > 9:
+            is_admin = db_user[9] == 1
         
         # Check if phone number exists
-        if not db_user[8]:  # phone_number column
+        phone_number = db_user[8] if db_user and len(db_user) > 8 else None
+        
+        if not phone_number:
             contact_keyboard = [
                 [KeyboardButton("📱 Share Phone Number", request_contact=True)],
                 [KeyboardButton("❌ Skip")]
@@ -456,9 +471,11 @@ def run_bot_process():
         if is_admin:
             keyboard.append([InlineKeyboardButton("👑 ADMIN PANEL", web_app={"url": f"{APP_URL}/admin?user={user.id}"})])
         
+        balance = db_user[4] if db_user and len(db_user) > 4 else 1000
+        
         await update.message.reply_text(
             f"🎰 Welcome to MK BINGO, {user.first_name}!\n"
-            f"💰 Balance: {db_user[4]} ETB",
+            f"💰 Balance: {balance} ETB",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
     
@@ -472,7 +489,13 @@ def run_bot_process():
             
             # Show main menu
             db_user = bot_get_user(user.id)
-            is_admin = db_user[9] == 1
+            
+            # Safely check admin
+            is_admin = False
+            if db_user and len(db_user) > 9:
+                is_admin = db_user[9] == 1
+            
+            balance = db_user[4] if db_user and len(db_user) > 4 else 1000
             
             keyboard = [
                 [InlineKeyboardButton("🎮 PLAY BINGO", web_app={"url": f"{APP_URL}/game?user={user.id}"})],
@@ -502,20 +525,27 @@ def run_bot_process():
         
         if data == "balance":
             db_user = bot_get_user(user.id)
+            balance = db_user[4] if db_user and len(db_user) > 4 else 1000
+            total_deposits = db_user[7] if db_user and len(db_user) > 7 else 0
+            
             await query.edit_message_text(
                 f"💳 *Your Balance*\n\n"
-                f"Available: *{db_user[4]} ETB*\n"
-                f"Total Deposits: *{db_user[7]} ETB*",
+                f"Available: *{balance} ETB*\n"
+                f"Total Deposits: *{total_deposits} ETB*",
                 parse_mode='Markdown'
             )
         
         elif data == "stats":
             db_user = bot_get_user(user.id)
+            balance = db_user[4] if db_user and len(db_user) > 4 else 1000
+            games_played = db_user[5] if db_user and len(db_user) > 5 else 0
+            wins = db_user[6] if db_user and len(db_user) > 6 else 0
+            
             await query.edit_message_text(
                 f"📊 *Your Stats*\n\n"
-                f"Balance: *{db_user[4]} ETB*\n"
-                f"Games Played: *{db_user[5]}*\n"
-                f"Wins: *{db_user[6]} ETB*",
+                f"Balance: *{balance} ETB*\n"
+                f"Games Played: *{games_played}*\n"
+                f"Wins: *{wins} ETB*",
                 parse_mode='Markdown'
             )
         
@@ -541,25 +571,27 @@ def run_bot_process():
             c.execute('''UPDATE transactions SET status='approved', approved_by=?, approved_at=? WHERE tx_id=?''',
                       (ADMIN_ID, datetime.now(), tx_id))
             c.execute("SELECT user_id, amount FROM transactions WHERE tx_id=?", (tx_id,))
-            user_id, amount = c.fetchone()
-            c.execute("UPDATE users SET balance=balance+?, total_deposits=total_deposits+? WHERE id=?", 
-                     (amount, amount, user_id))
-            c.execute("SELECT telegram_id FROM users WHERE id=?", (user_id,))
-            telegram_id = c.fetchone()[0]
+            result = c.fetchone()
+            if result:
+                user_id, amount = result
+                c.execute("UPDATE users SET balance=balance+?, total_deposits=total_deposits+? WHERE id=?", 
+                         (amount, amount, user_id))
+                c.execute("SELECT telegram_id FROM users WHERE id=?", (user_id,))
+                telegram_id = c.fetchone()[0]
+                
+                await context.bot.send_message(
+                    telegram_id, 
+                    f"✅ *Deposit Approved!*\n\n"
+                    f"Amount: *{amount} ETB*\n"
+                    f"Transaction ID: `{tx_id}`",
+                    parse_mode='Markdown'
+                )
+            
             conn.commit()
             conn.close()
             
-            await context.bot.send_message(
-                telegram_id, 
-                f"✅ *Deposit Approved!*\n\n"
-                f"Amount: *{amount} ETB*\n"
-                f"Transaction ID: `{tx_id}`",
-                parse_mode='Markdown'
-            )
-            
             await query.edit_message_text(
-                f"✅ *Deposit Approved*\n\n"
-                f"Amount: {amount} ETB",
+                f"✅ *Deposit Approved*",
                 parse_mode='Markdown'
             )
         
@@ -763,6 +795,8 @@ def purchase_cards():
     c = conn.cursor()
     c.execute("UPDATE users SET balance = balance - ? WHERE telegram_id = ?", 
               (total_paid, telegram_id))
+    c.execute("UPDATE users SET games_played = games_played + ? WHERE telegram_id = ?", 
+              (cards_bought, telegram_id))
     c.execute("SELECT balance FROM users WHERE telegram_id = ?", (telegram_id,))
     new_balance = c.fetchone()[0]
     conn.commit()
@@ -886,10 +920,13 @@ def admin_approve_transaction():
     
     telegram_id, amount = approve_transaction(tx_id, user['id'])
     
-    return jsonify({
-        'success': True,
-        'message': f'Approved {amount} ETB for user {telegram_id}'
-    })
+    if telegram_id:
+        return jsonify({
+            'success': True,
+            'message': f'Approved {amount} ETB for user {telegram_id}'
+        })
+    else:
+        return jsonify({'success': False, 'error': 'Transaction not found'})
 
 @application.route('/api/admin/reject-transaction', methods=['POST'])
 def admin_reject_transaction():
