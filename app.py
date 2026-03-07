@@ -1,248 +1,273 @@
 import os
 import sqlite3
-import asyncio
 import logging
-from datetime import datetime
+import asyncio
 from flask import Flask, request, jsonify, render_template
-from telegram import Bot, Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
+from telegram import (
+    Bot,
+    Update,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    KeyboardButton,
+    ReplyKeyboardMarkup
+)
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    MessageHandler,
+    ContextTypes,
+    filters
+)
 
-# Setup logging
+# ==================== LOGGING ====================
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ==================== CRITICAL: Create Flask app with CORRECT name ====================
-application = Flask(__name__)  # THIS MUST BE 'application' for Gunicorn
-app = application  # Alias for convenience
+# ==================== FLASK APP ====================
+application = Flask(__name__)
+app = application
 
-# Configuration
-BOT_TOKEN = os.environ.get('BOT_TOKEN')
-ADMIN_ID = os.environ.get('ADMIN_ID', '0')
-APP_URL = os.environ.get('RAILWAY_STATIC_URL', 'http://localhost:5000')
+# ==================== CONFIG ====================
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
+ADMIN_ID = os.environ.get("ADMIN_ID", "0")
+APP_URL = os.environ.get("RAILWAY_STATIC_URL")
+WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "mkbingo_secret")
 
-logger.info(f"Starting with BOT_TOKEN: {BOT_TOKEN[:5] if BOT_TOKEN else 'None'}...")
-logger.info(f"APP_URL: {APP_URL}")
+logger.info("Starting MK Bingo Bot")
 
-# ==================== SIMPLE DATABASE ====================
+# ==================== DATABASE ====================
 def init_db():
-    """Initialize database"""
-    os.makedirs('database', exist_ok=True)
-    conn = sqlite3.connect('database/bingo.db')
+    os.makedirs("database", exist_ok=True)
+
+    conn = sqlite3.connect("database/bingo.db")
     c = conn.cursor()
-    
-    # Users table
-    c.execute('''CREATE TABLE IF NOT EXISTS users
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                  telegram_id INTEGER UNIQUE,
-                  username TEXT,
-                  first_name TEXT,
-                  phone_number TEXT,
-                  balance INTEGER DEFAULT 1000)''')
-    
+
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS users(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        telegram_id INTEGER UNIQUE,
+        username TEXT,
+        first_name TEXT,
+        phone_number TEXT,
+        balance INTEGER DEFAULT 1000
+    )
+    """)
+
     conn.commit()
     conn.close()
-    logger.info("Database initialized")
 
 init_db()
 
-# ==================== DATABASE FUNCTIONS ====================
+# ==================== DB FUNCTIONS ====================
 def get_user(telegram_id):
-    """Get user by telegram ID"""
-    conn = sqlite3.connect('database/bingo.db')
+    conn = sqlite3.connect("database/bingo.db")
     c = conn.cursor()
-    c.execute("SELECT * FROM users WHERE telegram_id = ?", (telegram_id,))
+
+    c.execute("SELECT * FROM users WHERE telegram_id=?", (telegram_id,))
     user = c.fetchone()
+
     conn.close()
-    
+
     if user:
         return {
-            'id': user[0],
-            'telegram_id': user[1],
-            'username': user[2],
-            'first_name': user[3],
-            'phone_number': user[4],
-            'balance': user[5]
+            "telegram_id": user[1],
+            "username": user[2],
+            "first_name": user[3],
+            "phone_number": user[4],
+            "balance": user[5]
         }
+
     return None
 
-def create_user(telegram_id, username, first_name):
-    """Create new user"""
-    conn = sqlite3.connect('database/bingo.db')
-    c = conn.cursor()
-    try:
-        c.execute("INSERT OR IGNORE INTO users (telegram_id, username, first_name) VALUES (?, ?, ?)",
-                  (telegram_id, username, first_name))
-        conn.commit()
-    except Exception as e:
-        logger.error(f"Error creating user: {e}")
-    finally:
-        conn.close()
 
-def update_user_phone(telegram_id, phone_number):
-    """Update user's phone number"""
-    conn = sqlite3.connect('database/bingo.db')
+def create_user(tid, username, name):
+    conn = sqlite3.connect("database/bingo.db")
     c = conn.cursor()
-    try:
-        c.execute("UPDATE users SET phone_number = ? WHERE telegram_id = ?",
-                  (phone_number, telegram_id))
-        conn.commit()
-        return True
-    except Exception as e:
-        logger.error(f"Error updating phone: {e}")
-        return False
-    finally:
-        conn.close()
+
+    c.execute(
+        "INSERT OR IGNORE INTO users (telegram_id,username,first_name) VALUES (?,?,?)",
+        (tid, username, name)
+    )
+
+    conn.commit()
+    conn.close()
+
+
+def update_phone(tid, phone):
+    conn = sqlite3.connect("database/bingo.db")
+    c = conn.cursor()
+
+    c.execute(
+        "UPDATE users SET phone_number=? WHERE telegram_id=?",
+        (phone, tid)
+    )
+
+    conn.commit()
+    conn.close()
 
 # ==================== BOT HANDLERS ====================
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle /start command"""
+
     user = update.effective_user
-    logger.info(f"Start from {user.first_name} (ID: {user.id})")
-    
-    # Create or get user
+
     db_user = get_user(user.id)
+
     if not db_user:
         create_user(user.id, user.username, user.first_name)
         db_user = get_user(user.id)
-    
-    # Check if phone number is needed
-    if not db_user['phone_number']:
-        # Ask for phone number
-        contact_keyboard = [
-            [KeyboardButton("📱 Share Phone Number", request_contact=True)],
-            [KeyboardButton("❌ Skip")]
-        ]
-        reply_markup = ReplyKeyboardMarkup(contact_keyboard, resize_keyboard=True, one_time_keyboard=True)
-        
+
+    if not db_user["phone_number"]:
+
+        keyboard = [[KeyboardButton(
+            "📱 Share Phone Number",
+            request_contact=True
+        )]]
+
+        markup = ReplyKeyboardMarkup(
+            keyboard,
+            resize_keyboard=True,
+            one_time_keyboard=True
+        )
+
         await update.message.reply_text(
-            "📱 Please share your phone number:",
-            reply_markup=reply_markup
+            "📱 Please share your phone number",
+            reply_markup=markup
         )
         return
-    
-    # Create web app button
+
     keyboard = [[InlineKeyboardButton(
         "🎮 PLAY BINGO",
-        web_app={"url": f"{APP_URL}/game?user={user.id}"}
+        web_app={"url": f"https://{APP_URL}/game?user={user.id}"}
     )]]
-    
+
     await update.message.reply_text(
-        f"🎰 Welcome to MK BINGO, {user.first_name}!\n"
-        f"💰 Balance: {db_user['balance']} ETB\n\n"
-        f"Click the button below to play!",
+        f"🎰 Welcome {user.first_name}\n"
+        f"💰 Balance: {db_user['balance']} ETB",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle shared contact"""
+
+async def contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     contact = update.message.contact
     user = update.effective_user
-    
-    if contact and contact.user_id == user.id:
-        # Save phone number
-        if update_user_phone(user.id, contact.phone_number):
-            await update.message.reply_text(f"✅ Phone number saved!")
-            
-            # Now send the play button
-            db_user = get_user(user.id)
-            keyboard = [[InlineKeyboardButton(
-                "🎮 PLAY BINGO",
-                web_app={"url": f"{APP_URL}/game?user={user.id}"}
-            )]]
-            
-            await update.message.reply_text(
-                f"🎰 You can now play!",
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
-        else:
-            await update.message.reply_text("❌ Error saving phone number")
+
+    if contact.user_id == user.id:
+
+        update_phone(user.id, contact.phone_number)
+
+        keyboard = [[InlineKeyboardButton(
+            "🎮 PLAY BINGO",
+            web_app={"url": f"https://{APP_URL}/game?user={user.id}"}
+        )]]
+
+        await update.message.reply_text(
+            "✅ Phone saved",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+
     else:
-        await update.message.reply_text("❌ Please share your own contact")
 
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle regular messages"""
-    await update.message.reply_text("Please use /start to begin")
+        await update.message.reply_text("❌ Send your own contact")
 
-# ==================== BOT SETUP - RUN IN MAIN THREAD ====================
-def setup_bot():
-    """Setup and run bot in the main thread"""
-    if not BOT_TOKEN:
-        logger.error("No BOT_TOKEN")
-        return None
-    
-    try:
-        # Create application
-        bot_app = Application.builder().token(BOT_TOKEN).build()
-        
-        # Add handlers
-        bot_app.add_handler(CommandHandler("start", start))
-        bot_app.add_handler(MessageHandler(filters.CONTACT, handle_contact))
-        bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-        
-        logger.info("Bot setup complete")
-        return bot_app
-        
-    except Exception as e:
-        logger.error(f"Bot setup error: {e}")
-        return None
 
-# Initialize bot app
-bot_app = setup_bot()
+async def text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-# ==================== FLASK ROUTES ====================
-@application.route('/')
-def index():
-    return render_template('index.html')
+    await update.message.reply_text("Use /start")
 
-@application.route('/game')
+# ==================== BOT SETUP ====================
+
+bot_app = Application.builder().token(BOT_TOKEN).build()
+
+bot_app.add_handler(CommandHandler("start", start))
+bot_app.add_handler(MessageHandler(filters.CONTACT, contact))
+bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text))
+
+# ==================== WEBHOOK ROUTE ====================
+
+@application.route(f"/webhook/{WEBHOOK_SECRET}", methods=["POST"])
+async def telegram_webhook():
+
+    data = request.get_json()
+
+    update = Update.de_json(data, bot_app.bot)
+
+    await bot_app.process_update(update)
+
+    return "ok"
+
+# ==================== WEBSITE ====================
+
+@application.route("/")
+def home():
+    return render_template("index.html")
+
+@application.route("/game")
 def game():
-    user_id = request.args.get('user', 'guest')
+
+    uid = request.args.get("user")
+
     balance = 1000
-    phone = ''
-    
-    if user_id != 'guest':
-        user = get_user(int(user_id))
+    phone = ""
+
+    if uid:
+        user = get_user(int(uid))
+
         if user:
-            balance = user['balance']
-            phone = user['phone_number'] or ''
-    
-    return render_template('index.html', user_id=user_id, balance=balance, phone=phone)
+            balance = user["balance"]
+            phone = user["phone_number"]
 
-@application.route('/api/user/<int:telegram_id>')
-def get_user_data(telegram_id):
-    user = get_user(telegram_id)
+    return render_template(
+        "index.html",
+        user_id=uid,
+        balance=balance,
+        phone=phone
+    )
+
+# ==================== API ====================
+
+@application.route("/api/user/<int:uid>")
+def api_user(uid):
+
+    user = get_user(uid)
+
     if user:
-        return jsonify({
-            'success': True,
-            'balance': user['balance'],
-            'phone': user['phone_number'] or ''
-        })
-    return jsonify({'success': False, 'error': 'Not found'}), 404
 
-@application.route('/health')
+        return jsonify({
+            "success": True,
+            "balance": user["balance"],
+            "phone": user["phone_number"]
+        })
+
+    return jsonify({"success": False})
+
+# ==================== HEALTH ====================
+
+@application.route("/health")
 def health():
+
     return jsonify({
-        'status': 'ok',
-        'bot': 'configured' if BOT_TOKEN else 'no token'
+        "status": "ok"
     })
 
-# ==================== MAIN ====================
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    
-    # Start bot polling in background thread with proper event loop
-    if bot_app:
-        import threading
-        def run_bot():
-            try:
-                logger.info("Starting bot polling...")
-                bot_app.run_polling(drop_pending_updates=True)
-            except Exception as e:
-                logger.error(f"Bot polling error: {e}")
-        
-        bot_thread = threading.Thread(target=run_bot, daemon=True)
-        bot_thread.start()
-        logger.info("Bot thread started")
-    
-    # Run Flask
-    application.run(host='0.0.0.0', port=port)
+# ==================== START ====================
+
+async def set_webhook():
+
+    url = f"https://{APP_URL}/webhook/{WEBHOOK_SECRET}"
+
+    await bot_app.bot.set_webhook(url)
+
+    logger.info(f"Webhook set: {url}")
+
+asyncio.get_event_loop().run_until_complete(set_webhook())
+
+if __name__ == "__main__":
+
+    port = int(os.environ.get("PORT", 8080))
+
+    application.run(
+        host="0.0.0.0",
+        port=port
+    )
