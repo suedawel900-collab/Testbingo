@@ -6,8 +6,8 @@ import time
 import logging
 from datetime import datetime
 from flask import Flask, request, jsonify, render_template
-from telegram import Bot, Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
+from telegram import Bot, Update, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 from telegram.error import TimedOut, NetworkError
 
 # Setup logging
@@ -36,12 +36,13 @@ def init_db():
     conn = sqlite3.connect('database/bingo.db')
     c = conn.cursor()
     
-    # Users table
+    # Users table with phone number
     c.execute('''CREATE TABLE IF NOT EXISTS users
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   telegram_id INTEGER UNIQUE,
                   username TEXT,
                   first_name TEXT,
+                  phone_number TEXT,
                   balance INTEGER DEFAULT 1000,
                   games_played INTEGER DEFAULT 0,
                   wins INTEGER DEFAULT 0,
@@ -66,6 +67,7 @@ def init_db():
                   user_id INTEGER,
                   cards_bought INTEGER,
                   paid_amount INTEGER,
+                  phone_number TEXT,
                   joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                   FOREIGN KEY (user_id) REFERENCES users(id),
                   FOREIGN KEY (session_id) REFERENCES game_sessions(session_id))''')
@@ -105,11 +107,12 @@ def get_user(telegram_id):
             'telegram_id': user[1],
             'username': user[2],
             'first_name': user[3],
-            'balance': user[4],
-            'games_played': user[5],
-            'wins': user[6],
-            'total_deposits': user[7],
-            'created_at': user[8]
+            'phone_number': user[4],
+            'balance': user[5],
+            'games_played': user[6],
+            'wins': user[7],
+            'total_deposits': user[8],
+            'created_at': user[9]
         }
     return None
 
@@ -124,6 +127,22 @@ def create_user(telegram_id, username, first_name):
         logger.info(f"User created: {username} ({telegram_id})")
     except Exception as e:
         logger.error(f"Error creating user: {e}")
+    finally:
+        conn.close()
+
+def update_user_phone(telegram_id, phone_number):
+    """Update user's phone number"""
+    conn = sqlite3.connect('database/bingo.db')
+    c = conn.cursor()
+    try:
+        c.execute("UPDATE users SET phone_number = ? WHERE telegram_id = ?",
+                  (phone_number, telegram_id))
+        conn.commit()
+        logger.info(f"Phone number updated for {telegram_id}: {phone_number}")
+        return True
+    except Exception as e:
+        logger.error(f"Error updating phone: {e}")
+        return False
     finally:
         conn.close()
 
@@ -193,16 +212,16 @@ def create_new_session():
     logger.info(f"New game session created: {session_id}")
     return session_id
 
-def add_participant(session_id, user_id, cards_bought, paid_amount):
+def add_participant(session_id, user_id, cards_bought, paid_amount, phone_number=None):
     """Add a participant to the game session"""
     conn = sqlite3.connect('database/bingo.db')
     c = conn.cursor()
     
     # Add participant
     c.execute('''INSERT INTO game_participants 
-                 (session_id, user_id, cards_bought, paid_amount)
-                 VALUES (?, ?, ?, ?)''',
-              (session_id, user_id, cards_bought, paid_amount))
+                 (session_id, user_id, cards_bought, paid_amount, phone_number)
+                 VALUES (?, ?, ?, ?, ?)''',
+              (session_id, user_id, cards_bought, paid_amount, phone_number))
     
     # Update session stats
     c.execute('''UPDATE game_sessions 
@@ -245,6 +264,25 @@ def update_session_status(session_id, status):
     conn.commit()
     conn.close()
 
+def get_participants(session_id):
+    """Get all participants in a session with their phone numbers"""
+    conn = sqlite3.connect('database/bingo.db')
+    c = conn.cursor()
+    c.execute('''SELECT u.telegram_id, u.username, u.first_name, u.phone_number, p.cards_bought 
+                 FROM game_participants p
+                 JOIN users u ON p.user_id = u.id
+                 WHERE p.session_id = ?''', (session_id,))
+    participants = c.fetchall()
+    conn.close()
+    
+    return [{
+        'telegram_id': p[0],
+        'username': p[1],
+        'first_name': p[2],
+        'phone_number': p[3],
+        'cards_bought': p[4]
+    } for p in participants]
+
 # ==================== BOT HANDLERS ====================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /start command"""
@@ -260,6 +298,23 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             create_user(telegram_id, user.username, user.first_name)
             db_user = get_user(telegram_id)
         
+        # Check if phone number is needed
+        if not db_user['phone_number']:
+            # Ask for phone number
+            contact_keyboard = [
+                [KeyboardButton("📱 Share Phone Number", request_contact=True)],
+                [KeyboardButton("❌ Skip for now")]
+            ]
+            reply_markup = ReplyKeyboardMarkup(contact_keyboard, resize_keyboard=True, one_time_keyboard=True)
+            
+            await update.message.reply_text(
+                "📱 *Please share your phone number*\n\n"
+                "This helps us verify your identity for payments and withdrawals.",
+                reply_markup=reply_markup,
+                parse_mode='Markdown'
+            )
+            return
+        
         # Get current game session
         session = get_current_session()
         if session:
@@ -274,7 +329,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "🎮 PLAY BINGO",
                 web_app={"url": f"{APP_URL}/game?user={telegram_id}"}
             )],
-            [InlineKeyboardButton("💰 BALANCE", callback_data="balance")]
+            [InlineKeyboardButton("💰 BALANCE", callback_data="balance")],
+            [InlineKeyboardButton("📞 MY PHONE", callback_data="show_phone")]
         ]
         
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -289,6 +345,26 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"Error in start: {e}")
 
+async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle shared contact information"""
+    contact = update.message.contact
+    user = update.effective_user
+    
+    if contact and contact.user_id == user.id:
+        phone_number = contact.phone_number
+        # Save phone number to database
+        if update_user_phone(user.id, phone_number):
+            await update.message.reply_text(
+                f"✅ *Phone number saved!*\n\n"
+                f"📞 {phone_number}\n\n"
+                f"Use /start to continue.",
+                parse_mode='Markdown'
+            )
+        else:
+            await update.message.reply_text("❌ Error saving phone number. Please try again.")
+    else:
+        await update.message.reply_text("❌ Please share your own contact information.")
+
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle button callbacks"""
     query = update.callback_query
@@ -298,6 +374,13 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user = get_user(query.from_user.id)
         if user:
             await query.edit_message_text(f"💰 Your balance: {user['balance']} ETB")
+    
+    elif query.data == "show_phone":
+        user = get_user(query.from_user.id)
+        if user and user['phone_number']:
+            await query.edit_message_text(f"📞 Your phone number: {user['phone_number']}")
+        else:
+            await query.edit_message_text("❌ No phone number on file. Please use /start to add one.")
 
 # ==================== BOT SETUP ====================
 def run_bot():
@@ -313,6 +396,7 @@ def run_bot():
         # Add handlers
         application.add_handler(CommandHandler("start", start))
         application.add_handler(CallbackQueryHandler(button_callback))
+        application.add_handler(MessageHandler(filters.CONTACT, handle_contact))
         
         logger.info("Starting bot polling...")
         
@@ -345,14 +429,21 @@ def game():
     if user_id != 'guest':
         user = get_user(int(user_id))
         if user:
-            return render_template('index.html', user_id=user_id, balance=user['balance'])
-    return render_template('index.html', user_id='guest', balance=1000)
+            return render_template('index.html', 
+                                 user_id=user_id, 
+                                 balance=user['balance'],
+                                 phone=user['phone_number'] or '')
+    return render_template('index.html', user_id='guest', balance=1000, phone='')
 
 @app.route('/api/user/<int:telegram_id>')
 def get_user_data(telegram_id):
     user = get_user(telegram_id)
     if user:
-        return jsonify({'success': True, 'balance': user['balance']})
+        return jsonify({
+            'success': True, 
+            'balance': user['balance'],
+            'phone': user['phone_number'] or ''
+        })
     return jsonify({'success': False, 'error': 'Not found'}), 404
 
 @app.route('/api/game/settings')
@@ -390,6 +481,7 @@ def purchase_cards():
     telegram_id = data.get('user_id')
     cards_bought = data.get('cards_bought', 0)
     total_paid = data.get('total_paid', 0)
+    phone_number = data.get('phone_number')
     
     user = get_user(telegram_id)
     if not user:
@@ -406,18 +498,30 @@ def purchase_cards():
         session_id = session['session_id']
     
     # Add participant
-    session_stats = add_participant(session_id, user['id'], cards_bought, total_paid)
+    session_stats = add_participant(session_id, user['id'], cards_bought, total_paid, phone_number)
     
     # Check if we've reached 10 cards
     if session_stats['total_cards_sold'] >= 10:
         update_session_status(session_id, 'countdown')
-        # Trigger countdown in game
+        
+        # Get all participants to potentially notify them
+        participants = get_participants(session_id)
+        # You could send notifications here if needed
     
     return jsonify({
         'success': True,
         'new_balance': new_balance,
         'session': session_stats,
         'game_ready': session_stats['total_cards_sold'] >= 10
+    })
+
+@app.route('/api/game/participants/<session_id>')
+def get_game_participants(session_id):
+    """Get all participants in a session"""
+    participants = get_participants(session_id)
+    return jsonify({
+        'success': True,
+        'participants': participants
     })
 
 @app.route('/health')
