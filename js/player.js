@@ -5,7 +5,7 @@ import { database, ref, onValue, push, set, update, get, child } from './firebas
 let playerId = localStorage.getItem('playerId') || 'player_' + Math.random().toString(36).substr(2, 9);
 localStorage.setItem('playerId', playerId);
 
-let playerBalance = 1000; // Default balance
+let playerBalance = 1000; // Default balance - in production, this would come from a database
 let currentGame = null;
 let autoCallInterval = null;
 let selectedCards = [];
@@ -15,6 +15,12 @@ let playerCards = [];
 export function initPlayerDashboard() {
     // Save player ID
     localStorage.setItem('playerId', playerId);
+    
+    // Display player balance
+    const balanceElement = document.getElementById('playerBalance');
+    if (balanceElement) {
+        balanceElement.textContent = `ብር: ${playerBalance}`;
+    }
     
     // Listen for game settings
     onValue(ref(database, 'gameSettings'), (snapshot) => {
@@ -59,7 +65,15 @@ function checkActiveGame() {
     const activeGameSection = document.getElementById('activeGameSection');
     if (!activeGameSection) return;
     
-    if (currentGame && currentGame.status === 'active') {
+    if (currentGame && currentGame.status === 'active' && currentGame.players) {
+        // Check if player is already in the game
+        if (currentGame.players[playerId]) {
+            document.getElementById('activeGameMessage').textContent = 'ቀድሞውንም ተቀላቅለዋል!';
+            document.querySelector('#activeGameSection button').textContent = 'ወደ ጨዋታ ይግቡ';
+        } else {
+            document.getElementById('activeGameMessage').textContent = 'ንቁ ጨዋታ አለ!';
+            document.querySelector('#activeGameSection button').textContent = 'ይቀላቀሉ';
+        }
         activeGameSection.style.display = 'block';
     } else {
         activeGameSection.style.display = 'none';
@@ -68,8 +82,9 @@ function checkActiveGame() {
 
 // Select cards function
 export function selectCards() {
-    const count = document.getElementById('cardCount')?.value;
-    const totalPrice = parseInt(document.getElementById('totalPrice')?.textContent || '0');
+    const count = parseInt(document.getElementById('cardCount')?.value || '1');
+    const pricePerCard = parseInt(document.getElementById('cardPrice')?.textContent || '10');
+    const totalPrice = count * pricePerCard;
     
     if (playerBalance < totalPrice) {
         alert('በቂ ብር የለዎትም!');
@@ -79,6 +94,7 @@ export function selectCards() {
     // Save to localStorage and redirect
     localStorage.setItem('selectedCardCount', count);
     localStorage.setItem('totalPrice', totalPrice);
+    localStorage.setItem('pricePerCard', pricePerCard);
     window.location.href = 'select-cards.html';
 }
 
@@ -89,12 +105,20 @@ export function joinActiveGame() {
 
 // Generate bingo cards for selection
 export function generateCardSelection() {
-    const cardCount = localStorage.getItem('selectedCardCount');
+    const cardCount = parseInt(localStorage.getItem('selectedCardCount') || '1');
+    const pricePerCard = parseInt(localStorage.getItem('pricePerCard') || '10');
     const grid = document.getElementById('cardsGrid');
     if (!grid) return;
     
     grid.innerHTML = '';
     selectedCards = [];
+    playerCards = [];
+    
+    // Update price display
+    const priceDisplay = document.getElementById('cardPrice');
+    if (priceDisplay) {
+        priceDisplay.textContent = pricePerCard;
+    }
     
     for (let i = 0; i < cardCount; i++) {
         const card = createBingoCard(i, true);
@@ -111,6 +135,7 @@ function createBingoCard(index, selectable = false) {
     card.dataset.index = index;
     
     const numbers = generateBingoNumbers();
+    playerCards[index] = numbers; // Store card numbers
     
     let html = `<div class="bingo-card-header">ካርድ ${index + 1}</div>`;
     html += '<div class="bingo-card-body">';
@@ -127,7 +152,9 @@ function createBingoCard(index, selectable = false) {
         html += '<div class="bingo-row">';
         for (let col = 0; col < 5; col++) {
             const num = numbers[row][col];
-            html += `<div class="bingo-cell">${num || 'FREE'}</div>`;
+            const displayNum = num || 'FREE';
+            const cellClass = num ? 'bingo-cell' : 'bingo-cell free';
+            html += `<div class="${cellClass}">${displayNum}</div>`;
         }
         html += '</div>';
     }
@@ -149,10 +176,6 @@ function createBingoCard(index, selectable = false) {
         checkbox.addEventListener('change', function(e) {
             if (this.checked) {
                 selectedCards.push(index);
-                // Store card numbers
-                if (!playerCards[index]) {
-                    playerCards[index] = numbers;
-                }
             } else {
                 selectedCards = selectedCards.filter(i => i !== index);
             }
@@ -166,6 +189,8 @@ function createBingoCard(index, selectable = false) {
 // Generate random bingo numbers
 function generateBingoNumbers() {
     const numbers = [];
+    const usedNumbers = new Set();
+    
     for (let row = 0; row < 5; row++) {
         const rowNumbers = [];
         for (let col = 0; col < 5; col++) {
@@ -174,7 +199,12 @@ function generateBingoNumbers() {
             } else {
                 const min = col * 15 + 1;
                 const max = (col + 1) * 15;
-                rowNumbers.push(Math.floor(Math.random() * (max - min + 1)) + min);
+                let num;
+                do {
+                    num = Math.floor(Math.random() * (max - min + 1)) + min;
+                } while (usedNumbers.has(num)); // Ensure unique numbers per column
+                usedNumbers.add(num);
+                rowNumbers.push(num);
             }
         }
         numbers.push(rowNumbers);
@@ -211,20 +241,8 @@ export async function confirmSelection() {
         
         // Get selected cards
         const cards = [];
-        document.querySelectorAll('.bingo-card').forEach((card, idx) => {
-            if (selectedCards.includes(idx)) {
-                const cardNumbers = [];
-                const rows = card.querySelectorAll('.bingo-row:not(.header)');
-                rows.forEach(row => {
-                    const rowNumbers = [];
-                    row.querySelectorAll('.bingo-cell').forEach(cell => {
-                        const text = cell.textContent;
-                        rowNumbers.push(text === 'FREE' ? 'FREE' : parseInt(text));
-                    });
-                    cardNumbers.push(rowNumbers);
-                });
-                cards.push(cardNumbers);
-            }
+        selectedCards.sort((a, b) => a - b).forEach(index => {
+            cards.push(playerCards[index]);
         });
         
         // Save to database
@@ -236,6 +254,9 @@ export async function confirmSelection() {
             markedNumbers: []
         });
         
+        // Deduct from player balance (in production, this would be handled by a payment system)
+        playerBalance -= parseInt(localStorage.getItem('totalPrice'));
+        
         // Redirect to game
         window.location.href = 'game.html';
     } catch (error) {
@@ -246,6 +267,15 @@ export async function confirmSelection() {
 
 // Initialize game page
 export function initGame() {
+    // Check if player has cards
+    get(child(ref(database), `activeGame/players/${playerId}`)).then((snapshot) => {
+        if (!snapshot.exists()) {
+            alert('እባክዎ መጀመሪያ ካርዶችን ይምረጡ!');
+            window.location.href = 'dashboard.html';
+            return;
+        }
+    });
+    
     // Listen for game updates
     onValue(ref(database, 'activeGame'), (snapshot) => {
         const game = snapshot.val();
@@ -278,7 +308,7 @@ function updateGameDisplay(game) {
         
         const lastNumberElement = document.getElementById('lastNumber');
         if (lastNumberElement && game.calledNumbers.length > 0) {
-            lastNumberElement.textContent = 'የመጨረሻ ቁጥር: ' + game.calledNumbers[game.calledNumbers.length - 1];
+            lastNumberElement.textContent = game.calledNumbers[game.calledNumbers.length - 1];
         }
     }
     
@@ -315,7 +345,8 @@ function displayPlayerCards(cards, calledNumbers) {
             row.forEach(num => {
                 const isMarked = num === 'FREE' || calledNumbers.includes(num);
                 const className = isMarked ? 'bingo-cell marked' : 'bingo-cell';
-                html += `<div class="${className}">${num || 'FREE'}</div>`;
+                const displayNum = num === 'FREE' ? 'FREE' : num;
+                html += `<div class="${className}">${displayNum}</div>`;
             });
             html += '</div>';
         });
@@ -342,8 +373,8 @@ function handleAutoCall(event) {
 
 // Call a number
 export function callNumber() {
-    if (currentGame && currentGame.status === 'active') {
-        const newNumber = generateRandomNumber();
+    if (currentGame && currentGame.status === 'active' && !currentGame.winners) {
+        const newNumber = Math.floor(Math.random() * 75) + 1;
         
         // Check if number is new
         if (!currentGame.calledNumbers || !currentGame.calledNumbers.includes(newNumber)) {
@@ -352,22 +383,29 @@ export function callNumber() {
             calledNumbers.push(newNumber);
             
             updates['activeGame/calledNumbers'] = calledNumbers;
+            updates['activeGame/lastCalledAt'] = Date.now();
             
             update(ref(database), updates).catch(error => {
                 console.error('Error calling number:', error);
             });
+        } else {
+            // Try another number
+            callNumber();
         }
     }
 }
 
-// Generate random number between 1-75
-function generateRandomNumber() {
-    return Math.floor(Math.random() * 75) + 1;
-}
-
 // Check for bingo
 export function checkBingo() {
-    if (!currentGame) return;
+    if (!currentGame) {
+        alert('ጨዋታ አልተገኘም');
+        return;
+    }
+    
+    if (currentGame.winners) {
+        alert('ጨዋታው አልቋል!');
+        return;
+    }
     
     const playerCards = currentGame.players[playerId].cards;
     const calledNumbers = currentGame.calledNumbers || [];
@@ -378,6 +416,19 @@ export function checkBingo() {
         const result = checkCardForBingo(playerCards[cardIndex], calledNumbers, gameType);
         
         if (result.isBingo) {
+            // Check if already claimed
+            if (currentGame.bingoClaims) {
+                const claims = Object.values(currentGame.bingoClaims);
+                const alreadyClaimed = claims.some(claim => 
+                    claim.playerId === playerId && claim.cardIndex === cardIndex
+                );
+                
+                if (alreadyClaimed) {
+                    alert('ይህን ካርድ ቀድመው አስመዝግበዋል!');
+                    return;
+                }
+            }
+            
             // Submit bingo claim
             const bingoData = {
                 playerId: playerId,
@@ -390,7 +441,7 @@ export function checkBingo() {
             const bingoRef = push(ref(database, 'activeGame/bingoClaims'));
             set(bingoRef, bingoData)
                 .then(() => {
-                    alert('ቢንጎ! ጥያቄዎ ተልኳል።');
+                    alert('ቢንጎ! ጥያቄዎ ተልኳል። እባክዎ ይጠብቁ...');
                 })
                 .catch(error => {
                     console.error('Error submitting bingo:', error);
@@ -484,6 +535,26 @@ function checkCardForBingo(card, calledNumbers, gameType) {
         }
     }
     
+    // Check four corners
+    if (gameType === 'fourcorners') {
+        const corners = [
+            card[0][0], card[0][4],
+            card[4][0], card[4][4]
+        ];
+        
+        let cornersComplete = true;
+        for (let corner of corners) {
+            if (corner !== 'FREE' && !calledNumbers.includes(corner)) {
+                cornersComplete = false;
+                break;
+            }
+        }
+        
+        if (cornersComplete) {
+            return { isBingo: true, type: 'fourcorners', numbers: corners };
+        }
+    }
+    
     return { isBingo: false };
 }
 
@@ -498,18 +569,20 @@ function showWinners(game) {
     game.winners.forEach(winner => {
         html += `
             <div class="winner-item">
-                <h3>አሸናፊ: ${winner.playerId}</h3>
+                <h3>አሸናፊ: ${winner.playerId.substring(0, 8)}...</h3>
                 <p>አሸናፊ ካርድ: ${winner.cardIndex + 1}</p>
                 <p>አሸናፊ አይነት: ${winner.type}</p>
-                <p>ሽልማት: ${winner.prize} ብር</p>
+                <p>ሽልማት: ${winner.prize.toFixed(2)} ብር</p>
             </div>
         `;
     });
     html += '</div>';
     
     // Show winning cards if available
-    if (game.winningCards) {
+    if (game.winningCards && game.winningCards.length > 0) {
         html += '<h3>አሸናፊ ካርዶች:</h3>';
+        html += '<div class="winning-cards">';
+        
         game.winningCards.forEach((winCard, idx) => {
             html += `<div class="winning-card">`;
             html += `<h4>ካርድ ${idx + 1}</h4>`;
@@ -517,16 +590,29 @@ function showWinners(game) {
             winCard.card.forEach(row => {
                 html += '<div class="mini-row">';
                 row.forEach(num => {
-                    html += `<span class="mini-cell ${num === 'FREE' ? 'free' : ''}">${num || 'F'}</span>`;
+                    const displayNum = num === 'FREE' ? 'F' : num;
+                    const isCalled = game.calledNumbers?.includes(num);
+                    const cellClass = isCalled ? 'mini-cell called' : 'mini-cell';
+                    html += `<span class="${cellClass}">${displayNum}</span>`;
                 });
                 html += '</div>';
             });
-            html += '</div></div>';
+            html += '</div>';
+            html += `<p class="win-type">${winCard.type}</p>`;
+            html += '</div>';
         });
+        
+        html += '</div>';
     }
     
     winnerInfo.innerHTML = html;
     modal.style.display = 'block';
+    
+    // Disable bingo button
+    const bingoBtn = document.getElementById('bingoBtn');
+    if (bingoBtn) {
+        bingoBtn.disabled = true;
+    }
 }
 
 // Close winners modal
@@ -537,18 +623,24 @@ export function closeWinnerModal() {
     }
 }
 
+// Add money to player balance (for testing)
+export function addMoney(amount) {
+    playerBalance += amount;
+    const balanceElement = document.getElementById('playerBalance');
+    if (balanceElement) {
+        balanceElement.textContent = `ብር: ${playerBalance}`;
+    }
+    alert(`${amount} ብር ተጨምሯል! አሁን ያለው ብር: ${playerBalance}`);
+}
+
 // Initialize based on current page
 document.addEventListener('DOMContentLoaded', () => {
     const path = window.location.pathname;
     
-    if (path.includes('dashboard.html')) {
+    if (path.includes('dashboard.html') || path.endsWith('player/')) {
         initPlayerDashboard();
     } else if (path.includes('select-cards.html')) {
         generateCardSelection();
-        
-        // Get price from localStorage or settings
-        const pricePerCard = 10; // Default
-        document.getElementById('cardPrice').textContent = pricePerCard;
     } else if (path.includes('game.html')) {
         initGame();
     }
