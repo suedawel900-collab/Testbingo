@@ -1,97 +1,345 @@
-<!-- player/dashboard.html -->
 <!DOCTYPE html>
 <html lang="am">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ተጫዋች ዳሽቦርድ</title>
-    <link rel="stylesheet" href="../css/style.css">
+    <title>ተጫዋች ዳሽቦርድ - ቢንጎ ጨዋታ</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            max-width: 500px;
+            width: 100%;
+            background: white;
+            border-radius: 30px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        /* ዋና አርዕስት */
+        h1 {
+            font-size: 2.2em;
+            color: #333;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        h1::before {
+            content: "👤";
+            margin-right: 10px;
+        }
+
+        /* የተጫዋች መረጃ - ብር */
+        .balance-section {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 20px;
+            padding: 25px;
+            margin-bottom: 30px;
+            color: white;
+            text-align: center;
+        }
+
+        .balance-label {
+            font-size: 1.1em;
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+
+        .balance-amount {
+            font-size: 3.5em;
+            font-weight: bold;
+            line-height: 1.2;
+        }
+
+        .balance-currency {
+            font-size: 1.2em;
+            opacity: 0.8;
+            margin-left: 5px;
+        }
+
+        /* ንቁ ጨዋታ ክፍል */
+        .active-game-card {
+            background: #fef3c7;
+            border: 2px solid #fbbf24;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+            display: none;
+        }
+
+        .active-game-card h3 {
+            color: #92400e;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+
+        .join-game-btn {
+            background: #fbbf24;
+            color: #92400e;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 10px;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            font-size: 1.1em;
+            transition: all 0.3s;
+        }
+
+        .join-game-btn:hover {
+            background: #f59e0b;
+            transform: translateY(-2px);
+        }
+
+        /* አዲስ ጨዋታ ክፍል */
+        .new-game-section {
+            background: #f7fafc;
+            border-radius: 20px;
+            padding: 25px;
+            margin-bottom: 20px;
+        }
+
+        .section-title {
+            font-size: 1.5em;
+            color: #4a5568;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+
+        .section-title::before {
+            content: "🆕";
+            margin-right: 10px;
+        }
+
+        /* የካርድ መምረጫ */
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-group label {
+            display: block;
+            color: #4a5568;
+            font-weight: bold;
+            margin-bottom: 8px;
+            font-size: 1.1em;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 15px;
+            border: 3px solid #e2e8f0;
+            border-radius: 15px;
+            font-size: 1.2em;
+            transition: all 0.3s;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        /* የዋጋ መረጃ */
+        .price-info {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin: 25px 0;
+            border: 2px solid #e2e8f0;
+        }
+
+        .price-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+        }
+
+        .price-row:first-child {
+            border-bottom: 2px dashed #e2e8f0;
+        }
+
+        .price-label {
+            color: #718096;
+            font-size: 1.1em;
+        }
+
+        .price-value {
+            font-size: 1.4em;
+            font-weight: bold;
+            color: #4a5568;
+        }
+
+        .price-value.highlight {
+            color: #48bb78;
+            font-size: 1.6em;
+        }
+
+        /* መምረጫ ቁልፍ */
+        .select-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 18px 30px;
+            border-radius: 50px;
+            font-size: 1.3em;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .select-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        }
+
+        /* ማስታወሻ */
+        .note {
+            text-align: center;
+            color: #a0aec0;
+            margin-top: 20px;
+            font-size: 0.9em;
+        }
+    </style>
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            <h1>👤 ተጫዋች ዳሽቦርድ</h1>
-            <div class="balance" id="playerBalance">ብር: 1000</div>
+        <!-- ዋና አርዕስት -->
+        <h1>ተጫዋች ዳሽቦርድ</h1>
+
+        <!-- የተጫዋች ብር መጠን -->
+        <div class="balance-section">
+            <div class="balance-label">ጠር</div>
+            <div class="balance-amount" id="playerBalance">1000</div>
         </div>
 
-        <div class="active-game-section" id="activeGameSection" style="display: none;">
-            <h2>ንቁ ጨዋታ አለ</h2>
-            <button onclick="joinActiveGame()" class="btn btn-success">ወደ ጨዋታ ይግቡ</button>
+        <!-- ንቁ ጨዋታ ካለ -->
+        <div class="active-game-card" id="activeGameSection">
+            <h3>🎮 ንቁ ጨዋታ አለ!</h3>
+            <button class="join-game-btn" onclick="joinActiveGame()">ወደ ጨዋታ ይግቡ</button>
         </div>
 
+        <!-- አዲስ ጨዋታ ክፍል -->
         <div class="new-game-section">
-            <h2>አዲስ ጨዋታ ይጀምሩ</h2>
+            <div class="section-title">እዱስ ጤዋታ ይጀምሩ</div>
             
-            <div class="game-settings">
-                <div class="setting-item">
-                    <label>የካርድ ብዛት (1-1000):</label>
-                    <input type="number" id="cardCount" min="1" max="1000" value="1">
-                </div>
-
-                <div class="price-info">
-                    <p>የአንድ ካርድ ዋጋ: <span id="cardPrice">10</span> ብር</p>
-                    <p>ጠቅላላ ክፍያ: <span id="totalPrice">10</span> ብር</p>
-                </div>
-
-                <button onclick="selectCards()" class="btn btn-primary">ካርዶች ይምረጡ</button>
+            <!-- የካርድ ብዛት መምረጫ -->
+            <div class="input-group">
+                <label>የካርድ ጠዛት (1-1000):</label>
+                <input type="number" id="cardCount" min="1" max="1000" value="1" oninput="updateTotalPrice()">
             </div>
+
+            <!-- የዋጋ መረጃ -->
+            <div class="price-info">
+                <div class="price-row">
+                    <span class="price-label">የአንድ ካርድ ዋጋ:</span>
+                    <span class="price-value" id="pricePerCard">10</span>
+                    <span class="price-currency">ጠር</span>
+                </div>
+                <div class="price-row">
+                    <span class="price-label">ጠቅላለ ክፍያ:</span>
+                    <span class="price-value highlight" id="totalPrice">10</span>
+                    <span class="price-currency">ጠር</span>
+                </div>
+            </div>
+
+            <!-- ካርዶች ይምረጡ ቁልፍ -->
+            <button class="select-btn" onclick="selectCards()" id="selectBtn">
+                ካርድች ይምረጡ
+            </button>
         </div>
 
-        <div class="cards-preview" id="cardsPreview"></div>
+        <!-- ማስታወሻ -->
+        <div class="note">
+            * ከ1 እስከ 1000 ካርዶች መምረጥ ይችላሉ
+        </div>
     </div>
 
-    <script type="module">
-        import { database, ref, onValue, get, child } from '../js/firebase-config.js';
-
-        let playerId = localStorage.getItem('playerId') || 'player_' + Math.random().toString(36).substr(2, 9);
-        localStorage.setItem('playerId', playerId);
-
-        // የተጫዋች ብር መጠን
+    <script>
+        // የተጫዋች መረጃ
         let playerBalance = 1000;
+        let pricePerCard = 10; // ከአስተዳዳሪ የሚመጣ
 
-        // የአስተዳዳሪ ቅንብሮችን ማምጣት
-        onValue(ref(database, 'gameSettings'), (snapshot) => {
-            const settings = snapshot.val() || {};
-            document.getElementById('cardPrice').textContent = settings.cardPrice || 10;
+        // ገጽ ሲጫን
+        document.addEventListener('DOMContentLoaded', function() {
+            // የተጫዋች ብር ማሳየት
+            updateBalance();
+            
+            // ጠቅላላ ዋጋ ማስላት
             updateTotalPrice();
+            
+            // ንቁ ጨዋታ መኖሩን ማረጋገጥ
+            checkActiveGame();
         });
 
+        // የተጫዋች ብር ማሳደስ
+        function updateBalance() {
+            document.getElementById('playerBalance').textContent = playerBalance;
+        }
+
         // ጠቅላላ ዋጋ ማስላት
-        document.getElementById('cardCount').addEventListener('input', updateTotalPrice);
-        
         function updateTotalPrice() {
-            const count = document.getElementById('cardCount').value;
-            const price = document.getElementById('cardPrice').textContent;
-            document.getElementById('totalPrice').textContent = count * price;
+            const count = parseInt(document.getElementById('cardCount').value) || 1;
+            const total = count * pricePerCard;
+            document.getElementById('totalPrice').textContent = total;
         }
 
         // ንቁ ጨዋታ መኖሩን ማረጋገጥ
-        onValue(ref(database, 'activeGame'), (snapshot) => {
-            const game = snapshot.val();
-            if (game && game.status === 'active') {
+        function checkActiveGame() {
+            // ይህ ከ Firebase ወይም ከሌላ ዳታቤዝ መጥራት አለበት
+            const hasActiveGame = false; // ለሙከራ አሁን false ነው
+            
+            if (hasActiveGame) {
                 document.getElementById('activeGameSection').style.display = 'block';
-            } else {
-                document.getElementById('activeGameSection').style.display = 'none';
             }
-        });
+        }
 
-        window.selectCards = function() {
-            const count = document.getElementById('cardCount').value;
+        // ካርዶች መምረጫ ገጽ መሄድ
+        function selectCards() {
+            const cardCount = parseInt(document.getElementById('cardCount').value);
             const totalPrice = parseInt(document.getElementById('totalPrice').textContent);
             
+            // በቂ ብር መኖሩን ማረጋገጥ
             if (playerBalance < totalPrice) {
-                alert('በቂ ብር የለዎትም!');
+                alert('በቂ ጠር የለዎትም!');
                 return;
             }
-
-            // ወደ ካርድ ምርጫ ገጽ መሄድ
-            localStorage.setItem('selectedCardCount', count);
+            
+            // የተመረጡ ካርዶችን ማስቀመጥ
+            localStorage.setItem('selectedCardCount', cardCount);
             localStorage.setItem('totalPrice', totalPrice);
+            localStorage.setItem('pricePerCard', pricePerCard);
+            
+            // ወደ ካርድ ምርጫ ገጽ መሄድ
             window.location.href = 'select-cards.html';
         }
 
-        window.joinActiveGame = function() {
+        // ንቁ ጨዋታ መቀላቀል
+        function joinActiveGame() {
             window.location.href = 'game.html';
+        }
+
+        // ብር መጨመር (ለሙከራ)
+        function addMoney(amount) {
+            playerBalance += amount;
+            updateBalance();
         }
     </script>
 </body>
