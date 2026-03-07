@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MK BINGO - Compact</title>
+    <title>MK BINGO - Play</title>
     <style>
         * {
             box-sizing: border-box;
@@ -16,69 +16,54 @@
             background: linear-gradient(135deg, #1e3c72, #2a5298);
             min-height: 100vh;
             color: white;
-            padding: 8px;
+            padding: 10px;
         }
 
-        /* Ultra Compact Container */
+        /* Main Container */
         .container {
             max-width: 500px;
             margin: 0 auto;
             background: rgba(255, 255, 255, 0.1);
-            padding: 10px;
-            border-radius: 15px;
+            padding: 15px;
+            border-radius: 20px;
             backdrop-filter: blur(10px);
             border: 2px solid rgba(255,215,0,0.3);
         }
 
         h1 {
             text-align: center;
-            font-size: 1.6em;
-            margin-bottom: 5px;
+            font-size: 2em;
+            margin-bottom: 10px;
             color: gold;
-            text-shadow: 0 0 5px gold;
+            text-shadow: 0 0 10px gold;
         }
 
-        /* Mini Balance Box */
+        /* Balance Box */
         .balance-box {
             background: rgba(0,0,0,0.5);
-            padding: 5px 10px;
-            border-radius: 20px;
-            max-width: 150px;
-            margin: 5px auto;
-            border: 1px solid gold;
+            padding: 10px;
+            border-radius: 15px;
+            max-width: 200px;
+            margin: 10px auto;
+            border: 2px solid gold;
             text-align: center;
-            font-size: 0.9em;
         }
 
         .balance-box span {
-            font-size: 1.2em;
+            font-size: 1.5em;
             font-weight: bold;
             color: gold;
         }
 
-        /* Mini Phone Box */
-        .phone-box {
-            background: rgba(0,0,0,0.3);
-            padding: 3px 8px;
-            border-radius: 15px;
-            max-width: 180px;
-            margin: 3px auto;
-            text-align: center;
-            font-size: 0.8em;
-            cursor: pointer;
-        }
-
-        /* Game Info - Compact */
+        /* Game Status */
         .game-info {
             background: rgba(0,0,0,0.3);
-            padding: 8px;
+            padding: 10px;
             border-radius: 10px;
-            margin: 8px 0;
+            margin: 10px 0;
             display: flex;
             justify-content: space-around;
-            flex-wrap: wrap;
-            font-size: 0.85em;
-            border: 1px solid gold;
+            font-size: 0.9em;
         }
 
         .info-item {
@@ -87,29 +72,28 @@
 
         .info-value {
             font-size: 1.2em;
-            font-weight: bold;
             color: gold;
         }
 
-        /* Mini Card Grid for Selection */
+        /* Card Selection Grid */
         #grid {
             display: grid;
             grid-template-columns: repeat(10, 1fr);
-            gap: 2px;
-            max-height: 120px;
+            gap: 3px;
+            max-height: 150px;
             overflow-y: auto;
-            padding: 5px;
+            padding: 10px;
             background: rgba(0,0,0,0.3);
-            border-radius: 8px;
-            margin: 5px 0;
+            border-radius: 10px;
+            margin: 10px 0;
         }
 
         .box {
             background: white;
             color: black;
-            padding: 3px 0;
+            padding: 5px 0;
             border-radius: 3px;
-            font-size: 0.6em;
+            font-size: 0.7em;
             text-align: center;
             cursor: pointer;
         }
@@ -119,71 +103,87 @@
             color: white;
         }
 
-        /* Mini Preview */
-        #preview {
+        /* Summary Bar */
+        .summary-bar {
             display: flex;
-            flex-wrap: wrap;
-            gap: 5px;
-            justify-content: center;
-            margin: 5px 0;
-            max-height: 150px;
-            overflow-y: auto;
+            justify-content: space-between;
+            background: rgba(0,0,0,0.3);
+            padding: 8px 15px;
+            border-radius: 20px;
+            margin: 10px 0;
+            font-size: 0.9em;
         }
 
-        .previewCard {
-            background: rgba(0,0,0,0.5);
-            padding: 5px;
-            border-radius: 8px;
-            border: 1px solid gold;
-            max-width: 140px;
-            font-size: 0.7em;
+        /* Buttons */
+        button {
+            padding: 10px 20px;
+            font-size: 1em;
+            border: none;
+            border-radius: 25px;
+            background: #4CAF50;
+            color: white;
+            cursor: pointer;
+            margin: 5px;
+            font-weight: bold;
         }
 
-        .previewCard h4 {
-            font-size: 0.8em;
-            margin-bottom: 2px;
+        .cancel-btn {
+            background: #f44336;
         }
 
-        /* Ultra Compact BINGO Card */
+        .bingo-btn {
+            background: #f44336;
+            font-size: 1.5em;
+            padding: 15px 40px;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* ===== PROPER BINGO CARD STYLES ===== */
         .bingo-card {
             background: white;
-            border-radius: 6px;
-            padding: 4px;
-            margin: 5px auto;
-            max-width: 220px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.3);
+            border-radius: 10px;
+            padding: 10px;
+            margin: 15px auto;
+            max-width: 300px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.3);
         }
 
+        /* BINGO Header */
         .bingo-header {
             display: grid;
             grid-template-columns: repeat(5, 1fr);
-            gap: 2px;
-            margin-bottom: 2px;
+            gap: 3px;
+            margin-bottom: 5px;
         }
 
         .bingo-letter {
             background: gold;
             color: black;
             text-align: center;
-            padding: 3px 0;
+            padding: 8px 0;
             font-weight: bold;
-            font-size: 0.8em;
-            border-radius: 3px 3px 0 0;
+            font-size: 1.2em;
+            border-radius: 5px;
         }
 
+        /* 5x5 Grid */
         .gridCard {
             display: grid;
             grid-template-columns: repeat(5, 1fr);
-            gap: 2px;
+            gap: 3px;
         }
 
         .cell {
             background: #f0f0f0;
             color: #333;
-            padding: 4px 0;
-            border-radius: 3px;
+            padding: 10px 0;
+            border-radius: 5px;
             font-weight: bold;
-            font-size: 0.65em;
+            font-size: 0.9em;
             text-align: center;
             border: 1px solid #ccc;
         }
@@ -196,200 +196,90 @@
         .cell.free {
             background: gold;
             color: black;
+            font-weight: bold;
         }
 
-        /* Mini Called Numbers */
+        /* Called Numbers */
         .called-numbers {
             background: rgba(0,0,0,0.3);
-            padding: 5px;
-            border-radius: 8px;
-            margin: 5px 0;
-            max-height: 60px;
-            overflow-y: auto;
+            padding: 10px;
+            border-radius: 10px;
+            margin: 10px 0;
+            min-height: 60px;
             display: flex;
             flex-wrap: wrap;
-            gap: 2px;
+            gap: 5px;
         }
 
         .number-ball {
             display: inline-block;
-            width: 22px;
-            height: 22px;
+            width: 35px;
+            height: 35px;
             border-radius: 50%;
             background: gold;
             color: black;
             text-align: center;
-            line-height: 22px;
-            font-size: 0.6em;
+            line-height: 35px;
             font-weight: bold;
+            font-size: 0.9em;
         }
 
-        /* Tiny Buttons */
-        button {
-            padding: 5px 10px;
-            font-size: 0.8em;
-            border: none;
-            border-radius: 15px;
-            background: #4CAF50;
-            color: white;
-            cursor: pointer;
-            margin: 3px;
-        }
-
-        .bingo-btn {
-            background: #f44336;
-            font-size: 1em;
-            padding: 6px 15px;
-        }
-
-        .cancel-btn {
-            background: #f44336;
-        }
-
-        /* Mini Toggle Switch */
-        .toggle-container {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 5px;
-            margin: 5px 0;
-            font-size: 0.8em;
-        }
-
-        .toggle-switch {
-            position: relative;
-            display: inline-block;
-            width: 60px;
-            height: 26px;
-        }
-
-        .toggle-switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-
-        .slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: #f44336;
-            transition: .4s;
-            border-radius: 26px;
-        }
-
-        .slider:before {
-            position: absolute;
-            content: "MANUAL";
-            height: 20px;
-            width: 30px;
-            left: 3px;
-            bottom: 3px;
-            background: white;
-            transition: .4s;
-            border-radius: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.5em;
-            font-weight: bold;
-            color: black;
-        }
-
-        input:checked + .slider {
-            background: #4CAF50;
-        }
-
-        input:checked + .slider:before {
-            content: "AUTO";
-            transform: translateX(34px);
-        }
-
-        /* Mini Mode Indicator */
-        .mode-indicator {
-            text-align: center;
-            padding: 2px;
-            margin: 2px 0;
-            border-radius: 10px;
-            font-size: 0.7em;
-        }
-
-        /* Countdown - Compact */
+        /* Countdown */
         .countdown-container {
             text-align: center;
-            margin: 10px 0;
-            padding: 10px;
+            margin: 20px 0;
+            padding: 20px;
             background: rgba(0,0,0,0.5);
-            border-radius: 10px;
-            border: 2px solid gold;
+            border-radius: 15px;
+            border: 3px solid gold;
         }
 
         .countdown-timer {
-            font-size: 2.5em;
+            font-size: 4em;
             font-weight: bold;
             color: gold;
+            animation: pulse 1s infinite;
         }
 
-        /* Winners List - Compact */
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        /* Winners */
         .winners-list {
-            margin-top: 8px;
-            padding: 5px;
+            margin-top: 15px;
+            padding: 10px;
             background: rgba(255,215,0,0.2);
-            border-radius: 8px;
+            border-radius: 10px;
         }
 
         .winner-item {
-            padding: 3px;
-            margin: 2px 0;
-            background: rgba(0,0,0,0.3);
-            border-radius: 3px;
-            font-size: 0.7em;
-        }
-
-        /* Game Cards Container - Scrollable */
-        #gameCards {
-            max-height: 350px;
-            overflow-y: auto;
-            padding: 5px;
-        }
-
-        /* Summary Bar */
-        .summary-bar {
-            display: flex;
-            justify-content: space-between;
-            background: rgba(0,0,0,0.3);
-            padding: 5px 10px;
-            border-radius: 20px;
+            padding: 8px;
             margin: 5px 0;
-            font-size: 0.8em;
+            background: rgba(0,0,0,0.3);
+            border-radius: 5px;
         }
 
         .info-text {
             text-align: center;
-            font-size: 0.65em;
+            font-size: 0.8em;
             color: rgba(255,255,255,0.7);
-            margin-top: 5px;
+            margin-top: 10px;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🎰 BINGO</h1>
+        <h1>🎰 MK BINGO</h1>
 
-        <!-- Ultra Compact Header -->
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <div class="balance-box">
-                <span id="playerBalance">{{ balance|default('1000') }}</span> ETB
-            </div>
-            <div class="phone-box" id="phoneDisplay">
-                📞 <span id="userPhone">{{ phone|default('Add') }}</span>
-            </div>
+        <!-- Balance -->
+        <div class="balance-box">
+            <span id="playerBalance">{{ balance|default('1000') }}</span> ETB
         </div>
 
-        <!-- Mini Game Status -->
+        <!-- Game Status -->
         <div class="game-info">
             <div class="info-item">
                 <div>Cards</div>
@@ -405,8 +295,9 @@
             </div>
         </div>
 
-        <!-- Selection Page -->
+        <!-- SELECTION PAGE -->
         <div id="selectPage">
+            <h3 style="text-align: center;">🎫 Select Cards</h3>
             <div id="grid"></div>
 
             <div class="summary-bar">
@@ -415,58 +306,44 @@
             </div>
 
             <div style="text-align: center;">
-                <button onclick="confirmCards()" id="confirmBtn">✅ BUY</button>
+                <button onclick="confirmCards()" id="confirmBtn">✅ BUY CARDS</button>
                 <button class="cancel-btn" onclick="cancelSelection()">❌ CLEAR</button>
             </div>
 
-            <div id="preview"></div>
+            <div id="preview" style="display: flex; gap: 10px; overflow-x: auto; padding: 10px 0;"></div>
             
             <div class="info-text">
                 * 10 cards total to start • 30s countdown
             </div>
         </div>
 
-        <!-- Countdown Page -->
+        <!-- COUNTDOWN PAGE -->
         <div id="countdownPage" style="display: none;">
             <div class="countdown-container">
                 <div class="countdown-timer" id="countdownNumber">30</div>
-                <div style="font-size: 0.8em;">Game Starting...</div>
-                <div style="font-size: 0.7em; margin-top: 5px;">
+                <div style="font-size: 1.2em;">Game Starting...</div>
+                <div style="margin-top: 10px;">
                     <span id="finalCardsSold">10</span> cards • <span id="finalPlayers">0</span> players
                 </div>
             </div>
         </div>
 
-        <!-- Game Page -->
+        <!-- GAME PAGE -->
         <div id="gamePage" style="display: none;">
-            <!-- Mini Header -->
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-                <div style="font-size: 0.9em;">🎯 Game</div>
-                <div class="timer" id="gameTimer" style="font-size: 1em;">00:00</div>
-                <div style="font-size: 0.8em;">🏆 <span id="currentGamePrize">2000</span></div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                <h2 style="font-size: 1.2em;">🎯 Game</h2>
+                <div class="timer" id="gameTimer">00:00</div>
             </div>
 
-            <!-- Mode Toggle - Compact -->
-            <div class="toggle-container">
-                <span>MAN</span>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="autoMarkToggle" checked onchange="toggleMarkMode()">
-                    <span class="slider"></span>
-                </label>
-                <span>AUTO</span>
-            </div>
-
-            <!-- Called Numbers - Mini Scroll -->
-            <div class="called-numbers" id="calledSection">
-                <div id="numbersList"></div>
-            </div>
+            <!-- Called Numbers -->
+            <div class="called-numbers" id="numbersList"></div>
 
             <!-- BINGO Button -->
             <div style="text-align: center;">
                 <button class="bingo-btn" onclick="callBingo()" id="bingoBtn" disabled>🔴 BINGO!</button>
             </div>
 
-            <!-- Game Cards - Scrollable -->
+            <!-- Game Cards (will be populated with proper BINGO cards) -->
             <div id="gameCards"></div>
 
             <!-- Back Button -->
@@ -474,10 +351,8 @@
                 <button onclick="backToSelection()">🔙 BACK</button>
             </div>
 
-            <!-- Winners Display -->
-            <div id="winnersDisplay" class="winners-list" style="display: none;">
-                <div id="winnersList"></div>
-            </div>
+            <!-- Winners -->
+            <div id="winnersDisplay" class="winners-list" style="display: none;"></div>
         </div>
     </div>
 
@@ -486,7 +361,6 @@
         let selectedCards = {};
         let playerBalance = {{ balance|default(1000) }};
         let userId = "{{ user_id|default('guest') }}";
-        let userPhone = "{{ phone|default('') }}";
         let currentGameCards = {};
         let gameSettings = {
             calledNumbers: [],
@@ -500,82 +374,239 @@
         let sessionInfo = {
             totalCardsSold: 0,
             totalPlayers: 0,
-            prizePool: 0,
-            status: 'waiting'
+            prizePool: 0
         };
         
-        let bingoButtonEnabled = false;
-        let autoMarkEnabled = true;
-        let timerSeconds = 0;
         let gameTimer = null;
         let callInterval = null;
         let countdownInterval = null;
         let countdownValue = 30;
-        let manuallyMarked = {};
         let gameStarted = false;
-        let sessionCheckInterval = null;
+        let bingoButtonEnabled = false;
 
         const API_URL = window.location.origin;
 
-        // ==================== INITIALIZATION ====================
+        // ==================== INIT ====================
         window.onload = function() {
             createNumberGrid();
-            loadGameSettings();
-            updateSummary();
             checkGameSession();
-            sessionCheckInterval = setInterval(checkGameSession, 5000);
-            
-            document.getElementById('phoneDisplay').addEventListener('click', function() {
-                if (userId !== 'guest') {
-                    alert("📱 Update your phone in Telegram with /start");
-                }
-            });
+            setInterval(checkGameSession, 5000);
         };
 
-        // ==================== API FUNCTIONS ====================
-        async function loadGameSettings() {
-            try {
-                const response = await fetch(`${API_URL}/api/game/settings`);
-                const data = await response.json();
-                if (data.success) {
-                    gameSettings.gameType = data.game_type;
-                    gameSettings.cardPrice = data.card_price;
-                    gameSettings.prizeAmount = data.prize_pool;
-                    gameSettings.minCardsToStart = data.min_cards_to_start || 10;
-                }
-            } catch (error) {
-                console.log('Using default settings');
+        // ==================== CREATE CARD GRID ====================
+        function createNumberGrid() {
+            let grid = document.getElementById("grid");
+            for (let i = 1; i <= 100; i++) {
+                let box = document.createElement("div");
+                box.className = "box";
+                box.innerText = i;
+                box.id = `card-${i}`;
+
+                box.onclick = () => {
+                    if (gameStarted) {
+                        alert("Game in progress!");
+                        return;
+                    }
+                    
+                    if (selectedCards[i]) {
+                        delete selectedCards[i];
+                        box.classList.remove("selected");
+                    } else {
+                        selectedCards[i] = generateBingoCard(i);
+                        box.classList.add("selected");
+                    }
+
+                    updatePreview();
+                    updateSummary();
+                };
+
+                grid.appendChild(box);
             }
         }
 
+        // ==================== GENERATE PROPER BINGO CARD ====================
+        function generateBingoCard(cardNumber) {
+            let card = new Array(25).fill(0);
+            let seed = cardNumber || Math.floor(Math.random() * 1000);
+            
+            // B column (1-15)
+            let bCol = [];
+            while (bCol.length < 5) {
+                let n = ((seed * 1 + bCol.length * 7) % 15) + 1;
+                if (!bCol.includes(n)) bCol.push(n);
+            }
+            
+            // I column (16-30)
+            let iCol = [];
+            while (iCol.length < 5) {
+                let n = ((seed * 2 + iCol.length * 7) % 15) + 16;
+                if (!iCol.includes(n)) iCol.push(n);
+            }
+            
+            // N column (31-45)
+            let nCol = [];
+            while (nCol.length < 5) {
+                let n = ((seed * 3 + nCol.length * 7) % 15) + 31;
+                if (!nCol.includes(n)) nCol.push(n);
+            }
+            
+            // G column (46-60)
+            let gCol = [];
+            while (gCol.length < 5) {
+                let n = ((seed * 4 + gCol.length * 7) % 15) + 46;
+                if (!gCol.includes(n)) gCol.push(n);
+            }
+            
+            // O column (61-75)
+            let oCol = [];
+            while (oCol.length < 5) {
+                let n = ((seed * 5 + oCol.length * 7) % 15) + 61;
+                if (!oCol.includes(n)) oCol.push(n);
+            }
+            
+            // Fill card row by row
+            for (let row = 0; row < 5; row++) {
+                card[row * 5 + 0] = bCol[row];
+                card[row * 5 + 1] = iCol[row];
+                card[row * 5 + 2] = nCol[row];
+                card[row * 5 + 3] = gCol[row];
+                card[row * 5 + 4] = oCol[row];
+            }
+            
+            // Make center cell FREE (row 2, col 2 = index 12)
+            card[12] = "FREE";
+            
+            return card;
+        }
+
+        // ==================== CREATE CARD ELEMENT ====================
+        function createCardElement(card, cardNumber) {
+            let div = document.createElement("div");
+            div.className = "bingo-card";
+
+            // BINGO Header
+            let header = document.createElement("div");
+            header.className = "bingo-header";
+            ['B', 'I', 'N', 'G', 'O'].forEach(letter => {
+                let l = document.createElement("div");
+                l.className = "bingo-letter";
+                l.innerText = letter;
+                header.appendChild(l);
+            });
+            div.appendChild(header);
+
+            // 5x5 Grid
+            let grid = document.createElement("div");
+            grid.className = "gridCard";
+
+            card.forEach((num, index) => {
+                let cell = document.createElement("div");
+                cell.className = "cell";
+                
+                if (num === "FREE") {
+                    cell.classList.add("free");
+                } else if (gameSettings.calledNumbers.includes(num)) {
+                    cell.classList.add("marked");
+                }
+                
+                cell.innerText = num;
+                grid.appendChild(cell);
+            });
+
+            div.appendChild(grid);
+            
+            // Card number
+            let footer = document.createElement("div");
+            footer.style.textAlign = 'center';
+            footer.style.marginTop = '5px';
+            footer.style.color = 'gold';
+            footer.style.fontSize = '0.8em';
+            footer.innerText = `Card #${cardNumber}`;
+            div.appendChild(footer);
+            
+            return div;
+        }
+
+        // ==================== UPDATE PREVIEW ====================
+        function updatePreview() {
+            let preview = document.getElementById("preview");
+            preview.innerHTML = "";
+            
+            let count = 0;
+            for (let cardNum in selectedCards) {
+                if (count++ >= 2) break;
+                
+                let card = selectedCards[cardNum];
+                let div = document.createElement("div");
+                div.style.background = 'rgba(0,0,0,0.5)';
+                div.style.padding = '5px';
+                div.style.borderRadius = '5px';
+                div.style.minWidth = '120px';
+                
+                // Mini BINGO header
+                let header = document.createElement("div");
+                header.style.display = 'grid';
+                header.style.gridTemplateColumns = 'repeat(5,1fr)';
+                header.style.gap = '1px';
+                header.style.marginBottom = '2px';
+                ['B','I','N','G','O'].forEach(letter => {
+                    let l = document.createElement("div");
+                    l.style.background = 'gold';
+                    l.style.color = 'black';
+                    l.style.textAlign = 'center';
+                    l.style.fontSize = '0.6em';
+                    l.innerText = letter;
+                    header.appendChild(l);
+                });
+                div.appendChild(header);
+                
+                // Mini grid
+                let grid = document.createElement("div");
+                grid.style.display = 'grid';
+                grid.style.gridTemplateColumns = 'repeat(5,1fr)';
+                grid.style.gap = '1px';
+                
+                card.forEach(num => {
+                    let cell = document.createElement("div");
+                    cell.style.background = num === "FREE" ? 'gold' : 'white';
+                    cell.style.color = 'black';
+                    cell.style.textAlign = 'center';
+                    cell.style.fontSize = '0.55em';
+                    cell.style.padding = '2px 0';
+                    cell.innerText = num;
+                    grid.appendChild(cell);
+                });
+                
+                div.appendChild(grid);
+                preview.appendChild(div);
+            }
+        }
+
+        // ==================== UPDATE SUMMARY ====================
+        function updateSummary() {
+            let count = Object.keys(selectedCards).length;
+            let total = count * gameSettings.cardPrice;
+            document.getElementById("selectedCount").innerText = count;
+            document.getElementById("totalPrice").innerText = total;
+        }
+
+        // ==================== CHECK GAME SESSION ====================
         async function checkGameSession() {
             try {
-                const response = await fetch(`${API_URL}/api/game/session`);
-                const data = await response.json();
+                let response = await fetch(`${API_URL}/api/game/session`);
+                let data = await response.json();
                 if (data.success) {
-                    sessionInfo = {
-                        totalCardsSold: data.total_cards_sold,
-                        totalPlayers: data.total_players,
-                        prizePool: data.prize_pool,
-                        status: data.status
-                    };
-                    
-                    document.getElementById('totalCardsSold').innerText = sessionInfo.totalCardsSold;
-                    document.getElementById('totalPlayers').innerText = sessionInfo.totalPlayers;
-                    document.getElementById('prizePool').innerText = sessionInfo.prizePool;
-                    
-                    if (sessionInfo.status === 'countdown' && !gameStarted) {
-                        if (document.getElementById('gamePage').style.display !== 'block') {
-                            showCountdownPage();
-                        }
-                    }
+                    document.getElementById('totalCardsSold').innerText = data.total_cards_sold;
+                    document.getElementById('totalPlayers').innerText = data.total_players;
+                    document.getElementById('prizePool').innerText = data.prize_pool;
                 }
-            } catch (error) {
-                console.log('Error checking session:', error);
+            } catch (e) {
+                console.log('Session check failed');
             }
         }
 
-        async function purchaseCards() {
+        // ==================== CONFIRM CARDS ====================
+        async function confirmCards() {
             let count = Object.keys(selectedCards).length;
             let total = count * gameSettings.cardPrice;
             
@@ -590,234 +621,47 @@
             }
             
             try {
-                const response = await fetch(`${API_URL}/api/game/purchase`, {
+                let response = await fetch(`${API_URL}/api/game/purchase`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
                         user_id: userId,
                         cards_bought: count,
-                        total_paid: total,
-                        phone_number: userPhone
+                        total_paid: total
                     })
                 });
                 
-                const data = await response.json();
+                let data = await response.json();
                 
                 if (data.success) {
                     playerBalance = data.new_balance;
                     document.getElementById("playerBalance").innerText = playerBalance;
                     
-                    sessionInfo = {
-                        totalCardsSold: data.session.total_cards_sold,
-                        totalPlayers: data.session.total_players,
-                        prizePool: data.session.prize_pool
-                    };
-                    
+                    // Save cards for game
                     currentGameCards = { ...selectedCards };
                     
                     alert(`✅ ${count} cards bought!`);
                     
+                    // Clear selection
                     selectedCards = {};
                     document.querySelectorAll(".box").forEach(b => b.classList.remove("selected"));
                     updatePreview();
                     updateSummary();
                     
+                    // Show countdown if game is ready
                     if (data.game_ready) {
                         showCountdownPage();
                     }
                 }
             } catch (error) {
-                console.error('Error:', error);
+                alert('Error processing purchase');
             }
-        }
-
-        // ==================== CREATE NUMBER GRID ====================
-        function createNumberGrid() {
-            let grid = document.getElementById("grid");
-            for (let i = 1; i <= 100; i++) { // Reduced to 100 for compact view
-                let box = document.createElement("div");
-                box.className = "box";
-                box.innerText = i;
-                box.id = `card-${i}`;
-
-                box.onclick = () => {
-                    if (gameStarted || gameSettings.isGameActive) {
-                        alert("Game in progress!");
-                        return;
-                    }
-                    
-                    if (selectedCards[i]) {
-                        delete selectedCards[i];
-                        box.classList.remove("selected");
-                    } else {
-                        selectedCards[i] = generateCard(i);
-                        box.classList.add("selected");
-                    }
-
-                    updatePreview();
-                    updateSummary();
-                };
-
-                grid.appendChild(box);
-            }
-        }
-
-        // ==================== GENERATE CARD ====================
-        function generateCard(cardNumber) {
-            let card = [];
-            let seed = cardNumber || Math.floor(Math.random() * 1000);
-            
-            for (let col = 0; col < 5; col++) {
-                let min = col * 15 + 1;
-                let max = (col + 1) * 15;
-                
-                let colNumbers = [];
-                while (colNumbers.length < 5) {
-                    let n = ((seed * (col + 1) + colNumbers.length * 7) % (max - min + 1)) + min;
-                    if (!colNumbers.includes(n)) {
-                        colNumbers.push(n);
-                    }
-                }
-                
-                for (let row = 0; row < 5; row++) {
-                    let index = row * 5 + col;
-                    card[index] = colNumbers[row];
-                }
-            }
-            
-            card[12] = "FREE";
-            return card;
-        }
-
-        // ==================== TOGGLE MARK MODE ====================
-        function toggleMarkMode() {
-            autoMarkEnabled = document.getElementById('autoMarkToggle').checked;
-        }
-
-        // ==================== IS NUMBER MARKED ====================
-        function isNumberMarked(cardNum, number) {
-            if (number === "FREE") return true;
-            if (autoMarkEnabled) {
-                return gameSettings.calledNumbers.includes(number);
-            }
-            return manuallyMarked[cardNum]?.has(number) || false;
-        }
-
-        // ==================== CREATE CARD ELEMENT ====================
-        function createCardElement(card, cardNumber, isWinner = false) {
-            let div = document.createElement("div");
-            div.className = "bingo-card";
-            if (isWinner) div.style.border = '2px solid gold';
-
-            let header = document.createElement("div");
-            header.className = "bingo-header";
-            ['B', 'I', 'N', 'G', 'O'].forEach(letter => {
-                let l = document.createElement("div");
-                l.className = "bingo-letter";
-                l.innerText = letter;
-                header.appendChild(l);
-            });
-            div.appendChild(header);
-
-            let grid = document.createElement("div");
-            grid.className = "gridCard";
-
-            card.forEach((n, index) => {
-                let cell = document.createElement("div");
-                cell.className = "cell";
-                
-                if (n === "FREE") {
-                    cell.classList.add("free");
-                    cell.classList.add("marked");
-                } else if (isNumberMarked(cardNumber, n)) {
-                    cell.classList.add("marked");
-                }
-                
-                cell.onclick = function(e) {
-                    e.stopPropagation();
-                    if (n === "FREE") return;
-                    if (autoMarkEnabled) {
-                        alert("Switch to MANUAL mode");
-                        return;
-                    }
-                    if (!manuallyMarked[cardNumber]) {
-                        manuallyMarked[cardNumber] = new Set();
-                    }
-                    if (manuallyMarked[cardNumber].has(n)) {
-                        manuallyMarked[cardNumber].delete(n);
-                        this.classList.remove("marked");
-                    } else {
-                        manuallyMarked[cardNumber].add(n);
-                        this.classList.add("marked");
-                    }
-                };
-                
-                if (gameSettings.winners.some(w => w.cardNumber == cardNumber && w.cells.includes(index))) {
-                    cell.style.outline = '2px solid red';
-                }
-                
-                cell.innerText = n;
-                grid.appendChild(cell);
-            });
-
-            div.appendChild(grid);
-            return div;
-        }
-
-        // ==================== UPDATE PREVIEW ====================
-        function updatePreview() {
-            let preview = document.getElementById("preview");
-            preview.innerHTML = "";
-            
-            let count = 0;
-            for (let cardNum in selectedCards) {
-                if (count++ >= 2) break; // Show only 2 previews
-                
-                let div = document.createElement("div");
-                div.className = "previewCard";
-
-                let title = document.createElement("h4");
-                title.innerText = `#${cardNum}`;
-                div.appendChild(title);
-
-                let grid = document.createElement("div");
-                grid.style.display = 'grid';
-                grid.style.gridTemplateColumns = 'repeat(5,1fr)';
-                grid.style.gap = '1px';
-
-                selectedCards[cardNum].forEach(n => {
-                    let cell = document.createElement("div");
-                    cell.style.background = n === "FREE" ? 'gold' : 'white';
-                    cell.style.color = 'black';
-                    cell.style.padding = '2px 0';
-                    cell.style.fontSize = '0.55em';
-                    cell.style.textAlign = 'center';
-                    cell.innerText = n;
-                    grid.appendChild(cell);
-                });
-
-                div.appendChild(grid);
-                preview.appendChild(div);
-            }
-        }
-
-        // ==================== UPDATE SUMMARY ====================
-        function updateSummary() {
-            let count = Object.keys(selectedCards).length;
-            let total = count * gameSettings.cardPrice;
-            document.getElementById("selectedCount").innerText = count;
-            document.getElementById("totalPrice").innerText = total;
-        }
-
-        // ==================== CONFIRM CARDS ====================
-        function confirmCards() {
-            purchaseCards();
         }
 
         // ==================== CANCEL SELECTION ====================
         function cancelSelection() {
             if (Object.keys(selectedCards).length > 0) {
-                if (confirm("Clear?")) {
+                if (confirm("Clear all?")) {
                     selectedCards = {};
                     document.querySelectorAll(".box").forEach(b => b.classList.remove("selected"));
                     updatePreview();
@@ -826,11 +670,10 @@
             }
         }
 
-        // ==================== SHOW COUNTDOWN PAGE ====================
+        // ==================== SHOW COUNTDOWN ====================
         function showCountdownPage() {
             document.getElementById("selectPage").style.display = "none";
             document.getElementById("countdownPage").style.display = "block";
-            document.getElementById("gamePage").style.display = "none";
             
             document.getElementById('finalCardsSold').innerText = sessionInfo.totalCardsSold;
             document.getElementById('finalPlayers').innerText = sessionInfo.totalPlayers;
@@ -864,19 +707,18 @@
             gameSettings.isGameActive = true;
             
             startTimer();
-            updateGameCards();
+            showGameCards();
             startNumberCalls();
         }
 
-        // ==================== UPDATE GAME CARDS ====================
-        function updateGameCards() {
-            let game = document.getElementById("gameCards");
-            game.innerHTML = "";
+        // ==================== SHOW GAME CARDS ====================
+        function showGameCards() {
+            let container = document.getElementById("gameCards");
+            container.innerHTML = "";
             
             for (let cardNum in currentGameCards) {
-                let isWinner = gameSettings.winners.some(w => w.cardNumber == cardNum);
-                let cardElement = createCardElement(currentGameCards[cardNum], cardNum, isWinner);
-                game.appendChild(cardElement);
+                let cardElement = createCardElement(currentGameCards[cardNum], cardNum);
+                container.appendChild(cardElement);
             }
         }
 
@@ -894,104 +736,6 @@
             gameSettings.isGameActive = false;
             gameSettings.calledNumbers = [];
             gameSettings.winners = [];
-            manuallyMarked = {};
-            document.getElementById('numbersList').innerHTML = '';
-        }
-
-        // ==================== CHECK FOR WIN ====================
-        function checkForWin(cards) {
-            for (let cardNum in cards) {
-                let card = cards[cardNum];
-                
-                // Check rows
-                for (let row = 0; row < 5; row++) {
-                    let rowMarked = true;
-                    for (let col = 0; col < 5; col++) {
-                        let index = row * 5 + col;
-                        let num = card[index];
-                        if (num !== "FREE" && !isNumberMarked(cardNum, num)) {
-                            rowMarked = false;
-                            break;
-                        }
-                    }
-                    if (rowMarked) return { card: cardNum };
-                }
-                
-                // Check columns
-                for (let col = 0; col < 5; col++) {
-                    let colMarked = true;
-                    for (let row = 0; row < 5; row++) {
-                        let index = row * 5 + col;
-                        let num = card[index];
-                        if (num !== "FREE" && !isNumberMarked(cardNum, num)) {
-                            colMarked = false;
-                            break;
-                        }
-                    }
-                    if (colMarked) return { card: cardNum };
-                }
-                
-                // Check full house
-                let allMarked = true;
-                for (let i = 0; i < 25; i++) {
-                    let num = card[i];
-                    if (num !== "FREE" && !isNumberMarked(cardNum, num)) {
-                        allMarked = false;
-                        break;
-                    }
-                }
-                if (allMarked) return { card: cardNum };
-            }
-            return null;
-        }
-
-        // ==================== CALL BINGO ====================
-        function callBingo() {
-            if (!bingoButtonEnabled) {
-                alert("Wait for numbers!");
-                return;
-            }
-            
-            let winResult = checkForWin(currentGameCards);
-            
-            if (winResult) {
-                gameSettings.winners.push({ cardNumber: winResult.card });
-                
-                let prizePerWinner = gameSettings.prizeAmount / gameSettings.winners.length;
-                playerBalance += prizePerWinner;
-                document.getElementById("playerBalance").innerText = playerBalance;
-                
-                alert("🎉 YOU WON! 🎉");
-                document.getElementById("bingoBtn").disabled = true;
-                bingoButtonEnabled = false;
-                
-                showWinners();
-                gameSettings.isGameActive = false;
-                if (callInterval) clearInterval(callInterval);
-                updateGameCards();
-            } else {
-                alert("❌ FALSE BINGO!");
-                delete currentGameCards;
-                document.getElementById("gameCards").innerHTML = "<p style='color:red;text-align:center;'>❌ Disqualified</p>";
-                document.getElementById("bingoBtn").disabled = true;
-                if (callInterval) clearInterval(callInterval);
-            }
-        }
-
-        // ==================== SHOW WINNERS ====================
-        function showWinners() {
-            if (gameSettings.winners.length === 0) return;
-            
-            document.getElementById("winnersDisplay").style.display = "block";
-            let winnersList = document.getElementById("winnersList");
-            winnersList.innerHTML = "";
-            
-            gameSettings.winners.forEach((winner, index) => {
-                let div = document.createElement("div");
-                div.className = "winner-item";
-                div.innerHTML = `🏆 Winner #${index + 1}`;
-                winnersList.appendChild(div);
-            });
         }
 
         // ==================== START NUMBER CALLS ====================
@@ -1005,28 +749,57 @@
                 if (!gameSettings.calledNumbers.includes(num)) {
                     gameSettings.calledNumbers.push(num);
                     
+                    // Add to display
                     let list = document.getElementById('numbersList');
                     let ball = document.createElement('span');
                     ball.className = 'number-ball';
                     ball.innerText = num;
                     list.appendChild(ball);
                     
-                    updateGameCards();
+                    // Update cards
+                    showGameCards();
                     
+                    // Enable Bingo button
                     document.getElementById('bingoBtn').disabled = false;
                     bingoButtonEnabled = true;
                 }
             }, 3000);
         }
 
+        // ==================== CALL BINGO ====================
+        function callBingo() {
+            if (!bingoButtonEnabled) {
+                alert("Wait for numbers!");
+                return;
+            }
+            
+            // Simple win check (full house)
+            let allMarked = true;
+            for (let cardNum in currentGameCards) {
+                let card = currentGameCards[cardNum];
+                for (let i = 0; i < card.length; i++) {
+                    if (card[i] !== "FREE" && !gameSettings.calledNumbers.includes(card[i])) {
+                        allMarked = false;
+                        break;
+                    }
+                }
+            }
+            
+            if (allMarked) {
+                alert("🎉 BINGO! YOU WIN! 🎉");
+                document.getElementById('bingoBtn').disabled = true;
+            } else {
+                alert("❌ FALSE BINGO!");
+            }
+        }
+
         // ==================== TIMER ====================
         function startTimer() {
-            timerSeconds = 0;
-            if (gameTimer) clearInterval(gameTimer);
+            let seconds = 0;
             gameTimer = setInterval(() => {
-                timerSeconds++;
-                let mins = Math.floor(timerSeconds / 60);
-                let secs = timerSeconds % 60;
+                seconds++;
+                let mins = Math.floor(seconds / 60);
+                let secs = seconds % 60;
                 document.getElementById('gameTimer').innerText = 
                     `${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
             }, 1000);
