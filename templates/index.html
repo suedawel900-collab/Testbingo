@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MK BINGO - 30s Countdown</title>
+    <title>MK BINGO - Auto/Manual Mark</title>
     <style>
         * {
             box-sizing: border-box;
@@ -78,11 +78,6 @@
             margin-top: 5px;
         }
 
-        .countdown-small {
-            font-size: 0.9em;
-            color: rgba(255,255,255,0.8);
-        }
-
         @keyframes pulse {
             0% { transform: scale(1); }
             50% { transform: scale(1.1); }
@@ -103,6 +98,25 @@
         .timer {
             font-size: 1.5em;
             color: gold;
+        }
+
+        /* Mark Mode Indicator */
+        .mode-indicator {
+            text-align: center;
+            padding: 5px;
+            margin: 5px 0;
+            border-radius: 20px;
+            font-size: 0.9em;
+        }
+
+        .mode-auto {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .mode-manual {
+            background: #ff9800;
+            color: white;
         }
 
         /* Called Numbers */
@@ -126,6 +140,7 @@
             line-height: 30px;
             margin: 2px;
             font-size: 0.8em;
+            font-weight: bold;
         }
 
         /* BINGO Card */
@@ -170,16 +185,24 @@
             font-size: 0.9em;
             text-align: center;
             border: 1px solid #ccc;
+            cursor: pointer;
+            transition: all 0.2s;
         }
 
         .cell.marked {
             background: #4CAF50;
             color: white;
+            transform: scale(1.05);
         }
 
         .cell.free {
             background: gold;
             color: black;
+            cursor: default;
+        }
+
+        .cell.free.marked {
+            background: #ff9800;
         }
 
         .cell.winning-cell {
@@ -259,6 +282,7 @@
             color: white;
             cursor: pointer;
             margin: 5px;
+            font-weight: bold;
         }
 
         .bingo-btn {
@@ -288,8 +312,8 @@
         .toggle-switch {
             position: relative;
             display: inline-block;
-            width: 60px;
-            height: 30px;
+            width: 80px;
+            height: 34px;
         }
 
         .toggle-switch input {
@@ -307,19 +331,25 @@
             bottom: 0;
             background: #f44336;
             transition: .4s;
-            border-radius: 30px;
+            border-radius: 34px;
         }
 
         .slider:before {
             position: absolute;
-            content: "";
-            height: 24px;
-            width: 24px;
-            left: 3px;
-            bottom: 3px;
+            content: "MANUAL";
+            height: 26px;
+            width: 40px;
+            left: 4px;
+            bottom: 4px;
             background: white;
             transition: .4s;
-            border-radius: 50%;
+            border-radius: 26px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7em;
+            font-weight: bold;
+            color: black;
         }
 
         input:checked + .slider {
@@ -327,7 +357,8 @@
         }
 
         input:checked + .slider:before {
-            transform: translateX(30px);
+            content: "AUTO";
+            transform: translateX(46px);
         }
 
         /* Winners Display */
@@ -346,7 +377,6 @@
             font-size: 0.9em;
         }
 
-        /* Info Text */
         .info-text {
             text-align: center;
             font-size: 0.8em;
@@ -384,7 +414,8 @@
             
             <div class="info-text">
                 * 10 cards minimum for game to start<br>
-                * 30 second countdown after purchase
+                * 30 second countdown after purchase<br>
+                * Toggle AUTO/MANUAL to choose marking mode
             </div>
         </div>
 
@@ -398,29 +429,31 @@
                 <div class="timer" id="gameTimer">00:00</div>
             </div>
 
-            <!-- Countdown Display (shown during 30s wait) -->
+            <!-- Countdown Display -->
             <div id="countdownSection" class="countdown-container">
                 <div class="countdown-timer" id="countdownNumber">30</div>
                 <div class="countdown-text">Game Starting in...</div>
-                <div class="countdown-small">Get ready!</div>
             </div>
 
-            <!-- Auto-Mark Toggle (hidden during countdown) -->
+            <!-- Mode Indicator -->
+            <div id="modeIndicator" class="mode-indicator mode-auto" style="display: none;">
+                🔄 AUTO MARK MODE - Numbers mark automatically
+            </div>
+
+            <!-- Auto-Mark Toggle -->
             <div id="toggleSection" class="toggle-container" style="display: none;">
-                <span style="font-size: 0.8em;">MANUAL</span>
                 <label class="toggle-switch">
-                    <input type="checkbox" id="autoMarkToggle" checked>
+                    <input type="checkbox" id="autoMarkToggle" checked onchange="toggleMarkMode()">
                     <span class="slider"></span>
                 </label>
-                <span style="font-size: 0.8em;">AUTO</span>
             </div>
 
-            <!-- Called Numbers (hidden until game starts) -->
+            <!-- Called Numbers -->
             <div id="calledSection" class="called-numbers" style="display: none;">
                 <div id="numbersList"></div>
             </div>
 
-            <!-- BINGO Button (disabled during countdown) -->
+            <!-- BINGO Button -->
             <div style="text-align: center;">
                 <button class="bingo-btn" onclick="callBingo()" id="bingoBtn" disabled>🔴 BINGO!</button>
             </div>
@@ -456,12 +489,15 @@
             cardPrice: 10
         };
         let bingoButtonEnabled = false;
-        let autoMarkEnabled = true;
+        let autoMarkEnabled = true;  // Default to AUTO
         let timerSeconds = 0;
         let gameTimer = null;
         let callInterval = null;
         let countdownInterval = null;
         let countdownValue = 30;
+
+        // Track manually marked numbers for each card
+        let manuallyMarked = {};
 
         // API endpoint
         const API_URL = window.location.origin;
@@ -548,6 +584,39 @@
             return card;
         }
 
+        // ==================== TOGGLE MARK MODE ====================
+        function toggleMarkMode() {
+            autoMarkEnabled = document.getElementById('autoMarkToggle').checked;
+            let indicator = document.getElementById('modeIndicator');
+            
+            if (autoMarkEnabled) {
+                indicator.className = 'mode-indicator mode-auto';
+                indicator.innerHTML = '🔄 AUTO MARK MODE - Numbers mark automatically';
+            } else {
+                indicator.className = 'mode-indicator mode-manual';
+                indicator.innerHTML = '✋ MANUAL MARK MODE - Click cells to mark numbers';
+            }
+            
+            // Show mode indicator briefly
+            indicator.style.display = 'block';
+            setTimeout(() => {
+                indicator.style.display = 'none';
+            }, 3000);
+        }
+
+        // ==================== IS NUMBER MARKED ====================
+        function isNumberMarked(cardNum, number) {
+            if (number === "FREE") return true;
+            
+            // In AUTO mode, numbers are marked if called
+            if (autoMarkEnabled) {
+                return gameSettings.calledNumbers.includes(number);
+            }
+            
+            // In MANUAL mode, check manually marked set
+            return manuallyMarked[cardNum]?.has(number) || false;
+        }
+
         // ==================== CREATE CARD ELEMENT ====================
         function createCardElement(card, cardNumber, isWinner = false) {
             let div = document.createElement("div");
@@ -580,19 +649,49 @@
                 
                 if (n === "FREE") {
                     cell.classList.add("free");
+                    cell.classList.add("marked"); // FREE always marked
+                } else {
+                    // Check if number should be marked based on mode
+                    if (isNumberMarked(cardNumber, n)) {
+                        cell.classList.add("marked");
+                    }
                 }
                 
-                if (n !== "FREE" && gameSettings.calledNumbers.includes(n)) {
-                    cell.classList.add("marked");
-                }
-                
+                // Manual mark click handler
                 cell.onclick = function(e) {
                     e.stopPropagation();
-                    if (!autoMarkEnabled && n !== "FREE") {
-                        this.classList.toggle("marked");
+                    
+                    // Can't mark FREE space
+                    if (n === "FREE") {
+                        alert("FREE space is always marked!");
+                        return;
+                    }
+                    
+                    // In AUTO mode, clicking doesn't do anything
+                    if (autoMarkEnabled) {
+                        alert("Switch to MANUAL mode to mark numbers yourself");
+                        return;
+                    }
+                    
+                    // MANUAL mode: toggle mark
+                    if (!manuallyMarked[cardNumber]) {
+                        manuallyMarked[cardNumber] = new Set();
+                    }
+                    
+                    if (manuallyMarked[cardNumber].has(n)) {
+                        manuallyMarked[cardNumber].delete(n);
+                        this.classList.remove("marked");
+                    } else {
+                        manuallyMarked[cardNumber].add(n);
+                        this.classList.add("marked");
+                        // Add animation
+                        this.style.animation = 'none';
+                        this.offsetHeight; // trigger reflow
+                        this.style.animation = 'pulse 0.3s';
                     }
                 };
                 
+                // Highlight winning cells
                 if (gameSettings.winners.some(w => w.cardNumber == cardNumber && w.cells.includes(index))) {
                     cell.classList.add("winning-cell");
                 }
@@ -688,7 +787,6 @@
                 return;
             }
             
-            // Check if at least 10 cards are selected
             if (count < 10) {
                 alert(`❌ You need at least 10 cards to start a game!\nCurrent: ${count} cards`);
                 return;
@@ -704,6 +802,9 @@
             
             currentGameCards = { ...selectedCards };
             
+            // Reset manually marked numbers
+            manuallyMarked = {};
+            
             alert(`✅ ${count} cards purchased!\n⏱️ Game starts in 30 seconds...`);
             showGamePage();
             startCountdown();
@@ -717,13 +818,13 @@
             // Hide game elements during countdown
             document.getElementById('toggleSection').style.display = 'none';
             document.getElementById('calledSection').style.display = 'none';
+            document.getElementById('modeIndicator').style.display = 'none';
             document.getElementById('bingoBtn').disabled = true;
             
             countdownInterval = setInterval(() => {
                 countdownValue--;
                 document.getElementById('countdownNumber').innerText = countdownValue;
                 
-                // Make the countdown pulse faster as it gets lower
                 if (countdownValue <= 10) {
                     document.getElementById('countdownNumber').style.animation = 'pulse 0.5s infinite';
                 }
@@ -735,19 +836,19 @@
             }, 1000);
         }
 
-        // ==================== START GAME (after countdown) ====================
+        // ==================== START GAME ====================
         function startGame() {
             // Hide countdown, show game elements
             document.getElementById('countdownSection').style.display = 'none';
             document.getElementById('toggleSection').style.display = 'flex';
             document.getElementById('calledSection').style.display = 'block';
             
+            // Show initial mode
+            toggleMarkMode();
+            
             // Start the game
             gameSettings.isGameActive = true;
             startNumberCalls();
-            
-            // Enable Bingo button (will be enabled after first number)
-            bingoButtonEnabled = true;
         }
 
         // ==================== CANCEL SELECTION ====================
@@ -767,7 +868,6 @@
             document.getElementById("selectPage").style.display = "none";
             document.getElementById("gamePage").style.display = "block";
             
-            // Show countdown section, hide others
             document.getElementById('countdownSection').style.display = 'block';
             document.getElementById('toggleSection').style.display = 'none';
             document.getElementById('calledSection').style.display = 'none';
@@ -790,7 +890,6 @@
 
         // ==================== BACK TO SELECTION ====================
         function backToSelection() {
-            // Stop all timers
             if (countdownInterval) clearInterval(countdownInterval);
             if (gameTimer) clearInterval(gameTimer);
             if (callInterval) clearInterval(callInterval);
@@ -798,14 +897,67 @@
             document.getElementById("selectPage").style.display = "block";
             document.getElementById("gamePage").style.display = "none";
             
-            // Reset game state
             gameSettings.isGameActive = false;
             gameSettings.calledNumbers = [];
             gameSettings.winners = [];
+            manuallyMarked = {};
+        }
+
+        // ==================== CHECK FOR WIN (UPDATED) ====================
+        function checkForWin(cards) {
+            for (let cardNum in cards) {
+                let card = cards[cardNum];
+                
+                // Check each cell to see if it's marked
+                for (let row = 0; row < 5; row++) {
+                    let rowMarked = true;
+                    let rowCells = [];
+                    for (let col = 0; col < 5; col++) {
+                        let index = row * 5 + col;
+                        let num = card[index];
+                        if (num !== "FREE" && !isNumberMarked(cardNum, num)) {
+                            rowMarked = false;
+                            break;
+                        }
+                        rowCells.push(index);
+                    }
+                    if (rowMarked) return { card: cardNum, cells: rowCells };
+                }
+                
+                // Check columns
+                for (let col = 0; col < 5; col++) {
+                    let colMarked = true;
+                    let colCells = [];
+                    for (let row = 0; row < 5; row++) {
+                        let index = row * 5 + col;
+                        let num = card[index];
+                        if (num !== "FREE" && !isNumberMarked(cardNum, num)) {
+                            colMarked = false;
+                            break;
+                        }
+                        colCells.push(index);
+                    }
+                    if (colMarked) return { card: cardNum, cells: colCells };
+                }
+                
+                // Check full house
+                let allMarked = true;
+                let allCells = [];
+                for (let i = 0; i < 25; i++) {
+                    let num = card[i];
+                    if (num !== "FREE" && !isNumberMarked(cardNum, num)) {
+                        allMarked = false;
+                        break;
+                    }
+                    allCells.push(i);
+                }
+                if (allMarked) return { card: cardNum, cells: allCells };
+            }
+            return null;
         }
 
         // ==================== CALL BINGO ====================
-        async function callBingo() {
+        function callBingo() {
             if (!bingoButtonEnabled) {
                 alert("Bingo not available yet!");
                 return;
@@ -841,51 +993,6 @@
             }
         }
 
-        // ==================== CHECK FOR WIN ====================
-        function checkForWin(cards) {
-            for (let cardNum in cards) {
-                let card = cards[cardNum];
-                let called = gameSettings.calledNumbers;
-                
-                // Check full house
-                let allMarked = card.every((num, i) => 
-                    num === "FREE" || called.includes(num)
-                );
-                if (allMarked) return { card: cardNum, cells: card.map((_, i) => i) };
-                
-                // Check rows
-                for (let row = 0; row < 5; row++) {
-                    let rowMarked = true;
-                    let cells = [];
-                    for (let col = 0; col < 5; col++) {
-                        let index = row * 5 + col;
-                        if (card[index] !== "FREE" && !called.includes(card[index])) {
-                            rowMarked = false;
-                            break;
-                        }
-                        cells.push(index);
-                    }
-                    if (rowMarked) return { card: cardNum, cells };
-                }
-                
-                // Check columns
-                for (let col = 0; col < 5; col++) {
-                    let colMarked = true;
-                    let cells = [];
-                    for (let row = 0; row < 5; row++) {
-                        let index = row * 5 + col;
-                        if (card[index] !== "FREE" && !called.includes(card[index])) {
-                            colMarked = false;
-                            break;
-                        }
-                        cells.push(index);
-                    }
-                    if (colMarked) return { card: cardNum, cells };
-                }
-            }
-            return null;
-        }
-
         // ==================== SHOW WINNERS ====================
         function showWinners() {
             if (gameSettings.winners.length === 0) return;
@@ -909,12 +1016,7 @@
             });
         }
 
-        // ==================== AUTO-MARK TOGGLE ====================
-        document.getElementById('autoMarkToggle').addEventListener('change', function(e) {
-            autoMarkEnabled = e.target.checked;
-        });
-
-        // ==================== SIMULATE NUMBER CALLS ====================
+        // ==================== START NUMBER CALLS ====================
         function startNumberCalls() {
             gameSettings.calledNumbers = [];
             
@@ -937,6 +1039,7 @@
                     
                     // Enable Bingo button
                     document.getElementById('bingoBtn').disabled = false;
+                    bingoButtonEnabled = true;
                 }
             }, 3000);
         }
