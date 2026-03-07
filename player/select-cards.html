@@ -3,365 +3,344 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ካርዶች ይምረጡ - ቢንጎ ጨዋታ</title>
+    <title>ተጫዋች ዳሽቦርድ - ቢንጎ ጨዋታ</title>
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'Courier New', monospace;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
 
         body {
-            background: #f0f0f0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
             padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
 
         .container {
-            max-width: 1400px;
-            margin: 0 auto;
+            max-width: 500px;
+            width: 100%;
             background: white;
-            border: 3px solid #333;
-            padding: 20px;
+            border-radius: 30px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
         }
 
+        /* ዋና አርዕስት */
         h1 {
-            text-align: center;
-            font-size: 2.5em;
+            font-size: 2.2em;
+            color: #333;
             margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 3px solid #333;
+            text-align: center;
+            font-weight: bold;
         }
 
-        /* የቁጥር ግሪድ 1-100 */
-        .numbers-grid {
-            display: grid;
-            grid-template-columns: repeat(10, 1fr);
-            gap: 2px;
-            background: #333;
-            padding: 2px;
+        h1::before {
+            content: "👤";
+            margin-right: 10px;
+        }
+
+        /* የተጫዋች መረጃ - ብር */
+        .balance-section {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 20px;
+            padding: 25px;
             margin-bottom: 30px;
-        }
-
-        .number-cell {
-            background: white;
-            padding: 8px 4px;
-            text-align: center;
-            font-size: 14px;
-            font-weight: bold;
-            border: 1px solid #999;
-        }
-
-        .number-cell.called {
-            background: #90EE90;
-            font-weight: bold;
-        }
-
-        /* የቢንጎ ካርድ */
-        .bingo-card {
-            border: 3px solid #333;
-            margin: 30px 0;
-            padding: 20px;
-            background: white;
-        }
-
-        .bingo-title {
-            text-align: center;
-            font-size: 32px;
-            font-weight: bold;
-            margin-bottom: 20px;
-            letter-spacing: 10px;
-        }
-
-        .bingo-grid {
-            display: grid;
-            grid-template-columns: repeat(5, 1fr);
-            gap: 2px;
-            background: #333;
-            padding: 2px;
-        }
-
-        .bingo-header {
-            background: #333;
             color: white;
             text-align: center;
-            padding: 15px;
+        }
+
+        .balance-label {
+            font-size: 1.1em;
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+
+        .balance-amount {
+            font-size: 3.5em;
             font-weight: bold;
-            font-size: 24px;
+            line-height: 1.2;
         }
 
-        .bingo-cell {
-            background: white;
-            text-align: center;
-            padding: 20px 10px;
-            font-size: 20px;
-            font-weight: bold;
-            border: 1px solid #999;
+        .balance-currency {
+            font-size: 1.2em;
+            opacity: 0.8;
+            margin-left: 5px;
         }
 
-        .free-cell {
-            background: #FFD700;
-            font-size: 28px;
-        }
-
-        /* የካርድ ቁጥሮች */
-        .card-numbers {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin: 20px 0;
+        /* ንቁ ጨዋታ ክፍል */
+        .active-game-card {
+            background: #fef3c7;
+            border: 2px solid #fbbf24;
+            border-radius: 15px;
             padding: 20px;
-            border: 2px solid #333;
-            background: #f9f9f9;
+            margin-bottom: 30px;
+            display: none;
         }
 
-        .card-number-item {
-            padding: 8px 15px;
-            background: white;
-            border: 2px solid #333;
-            font-size: 16px;
+        .active-game-card h3 {
+            color: #92400e;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+
+        .join-game-btn {
+            background: #fbbf24;
+            color: #92400e;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 10px;
             font-weight: bold;
-            min-width: 50px;
-            text-align: center;
-        }
-
-        /* የካርዶች ዝርዝር */
-        .cards-list {
-            margin: 30px 0;
-            padding: 20px;
-            border: 3px solid #333;
-            background: #f9f9f9;
-        }
-
-        .cards-list h3 {
-            margin-bottom: 20px;
-            font-size: 24px;
-            font-weight: bold;
-        }
-
-        .cards-list ul {
-            list-style: none;
-        }
-
-        .cards-list li {
-            padding: 12px;
-            margin: 8px 0;
-            background: white;
-            border: 2px solid #333;
-            font-family: monospace;
-            font-size: 18px;
-            font-weight: bold;
-            text-align: center;
-        }
-
-        /* Confirm/Cancel Buttons */
-        .action-buttons {
-            display: flex;
-            gap: 20px;
-            margin-top: 30px;
-            padding-top: 20px;
-            border-top: 3px solid #333;
-        }
-
-        .btn {
-            flex: 1;
-            padding: 20px;
-            font-size: 28px;
-            font-weight: bold;
-            border: 3px solid #333;
-            background: white;
             cursor: pointer;
-            transition: all 0.2s;
+            width: 100%;
+            font-size: 1.1em;
+            transition: all 0.3s;
+        }
+
+        .join-game-btn:hover {
+            background: #f59e0b;
+            transform: translateY(-2px);
+        }
+
+        /* አዲስ ጨዋታ ክፍል */
+        .new-game-section {
+            background: #f7fafc;
+            border-radius: 20px;
+            padding: 25px;
+            margin-bottom: 20px;
+        }
+
+        .section-title {
+            font-size: 1.5em;
+            color: #4a5568;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+
+        .section-title::before {
+            content: "🆕";
+            margin-right: 10px;
+        }
+
+        /* የካርድ መምረጫ */
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-group label {
+            display: block;
+            color: #4a5568;
+            font-weight: bold;
+            margin-bottom: 8px;
+            font-size: 1.1em;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 15px;
+            border: 3px solid #e2e8f0;
+            border-radius: 15px;
+            font-size: 1.2em;
+            transition: all 0.3s;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        /* የዋጋ መረጃ */
+        .price-info {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin: 25px 0;
+            border: 2px solid #e2e8f0;
+        }
+
+        .price-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+        }
+
+        .price-row:first-child {
+            border-bottom: 2px dashed #e2e8f0;
+        }
+
+        .price-label {
+            color: #718096;
+            font-size: 1.1em;
+        }
+
+        .price-value {
+            font-size: 1.4em;
+            font-weight: bold;
+            color: #4a5568;
+        }
+
+        .price-value.highlight {
+            color: #48bb78;
+            font-size: 1.6em;
+        }
+
+        /* መምረጫ ቁልፍ */
+        .select-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 18px 30px;
+            border-radius: 50px;
+            font-size: 1.3em;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.3s;
             text-transform: uppercase;
-            letter-spacing: 2px;
+            letter-spacing: 1px;
         }
 
-        .btn:hover {
-            background: #333;
-            color: white;
-        }
-
-        .btn-confirm {
-            background: #4CAF50;
-            color: white;
-        }
-
-        .btn-cancel {
-            background: #f44336;
-            color: white;
-        }
-
-        .btn-confirm:hover {
-            background: #45a049;
-        }
-
-        .btn-cancel:hover {
-            background: #da190b;
+        .select-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
         }
 
         /* ማስታወሻ */
         .note {
-            margin-top: 20px;
-            padding: 15px;
-            background: #e0e0e0;
-            border: 2px solid #333;
             text-align: center;
-            font-weight: bold;
-            font-size: 16px;
+            color: #a0aec0;
+            margin-top: 20px;
+            font-size: 0.9em;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>የቢንጎ ካርድ ምርጫ</h1>
+        <!-- ዋና አርዕስት -->
+        <h1>ተጫዋች ዳሽቦርድ</h1>
 
-        <!-- የቁጥር ግሪድ 1-100 (እንደ ምስሉ) -->
-        <div class="numbers-grid" id="numberGrid"></div>
-
-        <!-- የቢንጎ ካርድ (እንደ ምስሉ) -->
-        <div class="bingo-card">
-            <div class="bingo-title">B I N G O</div>
-            <div class="bingo-grid" id="bingoGrid"></div>
+        <!-- የተጫዋች ብር መጠን -->
+        <div class="balance-section">
+            <div class="balance-label">ጠር</div>
+            <div class="balance-amount" id="playerBalance">1000</div>
         </div>
 
-        <!-- የካርድ ቁጥሮች (እንደ ምስሉ) -->
-        <div class="card-numbers" id="cardNumbers"></div>
-
-        <!-- የተመረጡ ካርዶች ዝርዝር (እንደ ምስሉ) -->
-        <div class="cards-list">
-            <h3>የተመረጡ ካርዶች ቁጥሮች:</h3>
-            <ul id="selectedCardsList">
-                <li>13   29   40   53   71</li>
-                <li>5    25   34   51   68</li>
-                <li>8    20    *   57   73</li>
-                <li>7    21   37   60   72</li>
-                <li>4    26   35   49   67</li>
-            </ul>
+        <!-- ንቁ ጨዋታ ካለ -->
+        <div class="active-game-card" id="activeGameSection">
+            <h3>🎮 ንቁ ጨዋታ አለ!</h3>
+            <button class="join-game-btn" onclick="joinActiveGame()">ወደ ጨዋታ ይግቡ</button>
         </div>
 
-        <!-- Confirm/Cancel Buttons (እንደ ምስሉ) -->
-        <div class="action-buttons">
-            <button class="btn btn-confirm" onclick="confirmSelection()">Confirm</button>
-            <button class="btn btn-cancel" onclick="cancelSelection()">Cancel</button>
+        <!-- አዲስ ጨዋታ ክፍል -->
+        <div class="new-game-section">
+            <div class="section-title">እዱስ ጤዋታ ይጀምሩ</div>
+            
+            <!-- የካርድ ብዛት መምረጫ -->
+            <div class="input-group">
+                <label>የካርድ ጠዛት (1-1000):</label>
+                <input type="number" id="cardCount" min="1" max="1000" value="1" oninput="updateTotalPrice()">
+            </div>
+
+            <!-- የዋጋ መረጃ -->
+            <div class="price-info">
+                <div class="price-row">
+                    <span class="price-label">የአንድ ካርድ ዋጋ:</span>
+                    <span class="price-value" id="pricePerCard">10</span>
+                    <span class="price-currency">ጠር</span>
+                </div>
+                <div class="price-row">
+                    <span class="price-label">ጠቅላለ ክፍያ:</span>
+                    <span class="price-value highlight" id="totalPrice">10</span>
+                    <span class="price-currency">ጠር</span>
+                </div>
+            </div>
+
+            <!-- ካርዶች ይምረጡ ቁልፍ -->
+            <button class="select-btn" onclick="selectCards()" id="selectBtn">
+                ካርድች ይምረጡ
+            </button>
         </div>
 
+        <!-- ማስታወሻ -->
         <div class="note">
-            * አረንጓዴ ቀለም ያላቸው ቁጥሮች የተጠሩ ቁጥሮች ናቸው
+            * ከ1 እስከ 1000 ካርዶች መምረጥ ይችላሉ
         </div>
     </div>
 
     <script>
-        // የቁጥር ግሪድ 1-100 ማመንጨት
-        function generateNumberGrid() {
-            const grid = document.getElementById('numberGrid');
+        // የተጫዋች መረጃ
+        let playerBalance = 1000;
+        let pricePerCard = 10; // ከአስተዳዳሪ የሚመጣ
+
+        // ገጽ ሲጫን
+        document.addEventListener('DOMContentLoaded', function() {
+            // የተጫዋች ብር ማሳየት
+            updateBalance();
             
-            for (let i = 1; i <= 100; i++) {
-                const cell = document.createElement('div');
-                cell.className = 'number-cell';
-                cell.textContent = i;
-                cell.id = `num-${i}`;
-                grid.appendChild(cell);
+            // ጠቅላላ ዋጋ ማስላት
+            updateTotalPrice();
+            
+            // ንቁ ጨዋታ መኖሩን ማረጋገጥ
+            checkActiveGame();
+        });
+
+        // የተጫዋች ብር ማሳደስ
+        function updateBalance() {
+            document.getElementById('playerBalance').textContent = playerBalance;
+        }
+
+        // ጠቅላላ ዋጋ ማስላት
+        function updateTotalPrice() {
+            const count = parseInt(document.getElementById('cardCount').value) || 1;
+            const total = count * pricePerCard;
+            document.getElementById('totalPrice').textContent = total;
+        }
+
+        // ንቁ ጨዋታ መኖሩን ማረጋገጥ
+        function checkActiveGame() {
+            // ይህ ከ Firebase ወይም ከሌላ ዳታቤዝ መጥራት አለበት
+            const hasActiveGame = false; // ለሙከራ አሁን false ነው
+            
+            if (hasActiveGame) {
+                document.getElementById('activeGameSection').style.display = 'block';
             }
         }
 
-        // የቢንጎ ካርድ ማመንጨት (እንደ ምስሉ)
-        function generateBingoCard() {
-            const grid = document.getElementById('bingoGrid');
+        // ካርዶች መምረጫ ገጽ መሄድ
+        function selectCards() {
+            const cardCount = parseInt(document.getElementById('cardCount').value);
+            const totalPrice = parseInt(document.getElementById('totalPrice').textContent);
             
-            // B I N G O headers
-            const headers = ['B', 'I', 'N', 'G', 'O'];
-            headers.forEach(letter => {
-                const header = document.createElement('div');
-                header.className = 'bingo-header';
-                header.textContent = letter;
-                grid.appendChild(header);
-            });
-
-            // ከምስሉ የተወሰዱ ቁጥሮች
-            const cardNumbers = [
-                [13, 29, 40, 53, 71],
-                [5, 25, 34, 51, 68],
-                [8, 20, '*', 57, 73],
-                [7, 21, 37, 60, 72],
-                [4, 26, 35, 49, 67]
-            ];
-
-            // ቁጥሮቹን ማስገባት
-            cardNumbers.forEach(row => {
-                row.forEach(num => {
-                    const cell = document.createElement('div');
-                    cell.className = num === '*' ? 'bingo-cell free-cell' : 'bingo-cell';
-                    cell.textContent = num;
-                    grid.appendChild(cell);
-                });
-            });
-        }
-
-        // የካርድ ቁጥሮች ማሳየት (እንደ ምስሉ)
-        function displayCardNumbers() {
-            const container = document.getElementById('cardNumbers');
-            const numbers = [13, 29, 40, 53, 71, 5, 25, 34, 51, 68, 8, 20, 57, 73, 7, 21, 37, 60, 72, 4, 26, 35, 49, 67];
+            // በቂ ብር መኖሩን ማረጋገጥ
+            if (playerBalance < totalPrice) {
+                alert('በቂ ጠር የለዎትም!');
+                return;
+            }
             
-            numbers.sort((a, b) => a - b);
-            
-            numbers.forEach(num => {
-                const span = document.createElement('span');
-                span.className = 'card-number-item';
-                span.textContent = num;
-                container.appendChild(span);
-            });
-        }
-
-        // የተጠሩ ቁጥሮችን ማጉላት
-        function highlightCalledNumbers() {
-            const calledNumbers = [13, 29, 40, 53, 71, 5, 25, 34, 51, 68, 8, 20, 57, 73, 7, 21, 37, 60, 72, 4, 26, 35, 49, 67];
-            
-            calledNumbers.forEach(num => {
-                const cell = document.getElementById(`num-${num}`);
-                if (cell) {
-                    cell.classList.add('called');
-                }
-            });
-        }
-
-        // Confirm function
-        function confirmSelection() {
-            const selectedCards = [
-                [13, 29, 40, 53, 71],
-                [5, 25, 34, 51, 68],
-                [8, 20, '*', 57, 73],
-                [7, 21, 37, 60, 72],
-                [4, 26, 35, 49, 67]
-            ];
-            
-            localStorage.setItem('selectedCards', JSON.stringify(selectedCards));
-            
-            // የክፍያ መረጃ ማስቀመጥ
-            const totalCards = selectedCards.length;
-            const pricePerCard = 10; // ከadmin የሚመጣ
-            const totalPrice = totalCards * pricePerCard;
-            
-            localStorage.setItem('selectedCardCount', totalCards);
+            // የተመረጡ ካርዶችን ማስቀመጥ
+            localStorage.setItem('selectedCardCount', cardCount);
             localStorage.setItem('totalPrice', totalPrice);
+            localStorage.setItem('pricePerCard', pricePerCard);
             
-            alert(`5 ካርዶች ተመርጠዋል!\nጠቅላላ ክፍያ: ${totalPrice} ብር`);
-            
-            // ወደ ክፍያ ገጽ መሄድ
-            // window.location.href = 'payment.html';
+            // ወደ ካርድ ምርጫ ገጽ መሄድ
+            window.location.href = 'select-cards.html';
         }
 
-        // Cancel function
-        function cancelSelection() {
-            if (confirm('እርግጠኛ ነዎት መሰረዝ ይፈልጋሉ?')) {
-                window.location.href = 'dashboard.html';
-            }
+        // ንቁ ጨዋታ መቀላቀል
+        function joinActiveGame() {
+            window.location.href = 'game.html';
         }
 
-        // ሁሉንም አስጀምር
-        generateNumberGrid();
-        generateBingoCard();
-        displayCardNumbers();
-        highlightCalledNumbers();
+        // ብር መጨመር (ለሙከራ)
+        function addMoney(amount) {
+            playerBalance += amount;
+            updateBalance();
+        }
     </script>
 </body>
 </html>
