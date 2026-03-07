@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MK BINGO - Auto/Manual Mark</title>
+    <title>MK BINGO - 10 Cards Total</title>
     <style>
         * {
             box-sizing: border-box;
@@ -54,11 +54,44 @@
             color: gold;
         }
 
+        /* Game Info */
+        .game-info {
+            background: rgba(0,0,0,0.3);
+            padding: 15px;
+            border-radius: 15px;
+            margin: 15px 0;
+            text-align: center;
+            border: 2px solid gold;
+        }
+
+        .cards-sold {
+            font-size: 2em;
+            font-weight: bold;
+            color: gold;
+        }
+
+        .players-count {
+            font-size: 1.2em;
+            color: #ffd700;
+        }
+
+        .waiting-message {
+            color: #ff9800;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+
+        .ready-message {
+            color: #4CAF50;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+
         /* Countdown Display */
         .countdown-container {
             text-align: center;
             margin: 15px 0;
-            padding: 15px;
+            padding: 20px;
             background: rgba(0,0,0,0.5);
             border-radius: 15px;
             border: 2px solid gold;
@@ -100,7 +133,7 @@
             color: gold;
         }
 
-        /* Mark Mode Indicator */
+        /* Mode Indicator */
         .mode-indicator {
             text-align: center;
             padding: 5px;
@@ -394,28 +427,41 @@
             <span id="playerBalance">{{ balance|default('1000') }}</span> ETB
         </div>
 
+        <!-- Game Status Display -->
+        <div id="gameStatus" class="game-info">
+            <div>Cards Sold: <span id="totalCardsSold" class="cards-sold">0</span>/10</div>
+            <div class="players-count">Players: <span id="totalPlayers">0</span></div>
+            <div>Prize Pool: <span id="prizePool">0</span> ETB</div>
+            <div id="statusMessage" class="waiting-message">⏳ Waiting for more players...</div>
+        </div>
+
         <!-- Card Selection Page -->
         <div id="selectPage">
-            <h3 style="text-align: center; font-size: 1.2em;">🎫 Select Cards (1-200)</h3>
+            <h3 style="text-align: center; font-size: 1.2em;">🎫 Select Your Cards</h3>
             <div id="grid"></div>
 
             <div style="text-align: center; margin: 5px;">
-                <span>Selected: <span id="selectedCount">0</span></span>
+                <span>Your Cards: <span id="selectedCount">0</span></span>
                 <span style="margin-left: 15px;">Total: <span id="totalPrice">0</span> ETB</span>
             </div>
 
             <div style="text-align: center;">
-                <button onclick="confirmCards()">✅ CONFIRM</button>
-                <button class="cancel-btn" onclick="cancelSelection()">❌ CANCEL</button>
+                <button onclick="confirmCards()" id="confirmBtn">✅ BUY CARDS</button>
+                <button class="cancel-btn" onclick="cancelSelection()">❌ CLEAR</button>
             </div>
 
-            <h3 style="text-align: center; font-size: 1.2em; margin-top: 10px;">📋 Selected Cards</h3>
+            <h3 style="text-align: center; font-size: 1.2em; margin-top: 10px;">📋 Your Selected Cards</h3>
             <div id="preview"></div>
-            
-            <div class="info-text">
-                * 10 cards minimum for game to start<br>
-                * 30 second countdown after purchase<br>
-                * Toggle AUTO/MANUAL to choose marking mode
+        </div>
+
+        <!-- Countdown Page (shown when 10 cards reached) -->
+        <div id="countdownPage" style="display: none;">
+            <div class="countdown-container">
+                <div class="countdown-timer" id="countdownNumber">30</div>
+                <div class="countdown-text">Game Starting in...</div>
+                <div style="margin-top: 10px;">Total Cards: <span id="finalCardsSold">10</span></div>
+                <div>Players: <span id="finalPlayers">0</span></div>
+                <div>Prize: <span id="finalPrize">0</span> ETB</div>
             </div>
         </div>
 
@@ -429,19 +475,13 @@
                 <div class="timer" id="gameTimer">00:00</div>
             </div>
 
-            <!-- Countdown Display -->
-            <div id="countdownSection" class="countdown-container">
-                <div class="countdown-timer" id="countdownNumber">30</div>
-                <div class="countdown-text">Game Starting in...</div>
-            </div>
-
             <!-- Mode Indicator -->
             <div id="modeIndicator" class="mode-indicator mode-auto" style="display: none;">
-                🔄 AUTO MARK MODE - Numbers mark automatically
+                🔄 AUTO MARK MODE
             </div>
 
             <!-- Auto-Mark Toggle -->
-            <div id="toggleSection" class="toggle-container" style="display: none;">
+            <div id="toggleSection" class="toggle-container">
                 <label class="toggle-switch">
                     <input type="checkbox" id="autoMarkToggle" checked onchange="toggleMarkMode()">
                     <span class="slider"></span>
@@ -449,7 +489,7 @@
             </div>
 
             <!-- Called Numbers -->
-            <div id="calledSection" class="called-numbers" style="display: none;">
+            <div id="calledSection" class="called-numbers">
                 <div id="numbersList"></div>
             </div>
 
@@ -463,7 +503,7 @@
 
             <!-- Back Button -->
             <div style="text-align: center;">
-                <button onclick="backToSelection()">🔙 BACK</button>
+                <button onclick="backToSelection()">🔙 LEAVE GAME</button>
             </div>
 
             <!-- Winners Display -->
@@ -486,20 +526,27 @@
             isGameActive: false,
             gameType: 'full house',
             prizeAmount: 2000,
-            cardPrice: 10
+            cardPrice: 10,
+            minCardsToStart: 10
         };
+        let sessionInfo = {
+            totalCardsSold: 0,
+            totalPlayers: 0,
+            prizePool: 0,
+            status: 'waiting'
+        };
+        
         let bingoButtonEnabled = false;
-        let autoMarkEnabled = true;  // Default to AUTO
+        let autoMarkEnabled = true;
         let timerSeconds = 0;
         let gameTimer = null;
         let callInterval = null;
         let countdownInterval = null;
         let countdownValue = 30;
-
-        // Track manually marked numbers for each card
         let manuallyMarked = {};
+        let gameStarted = false;
+        let sessionCheckInterval = null;
 
-        // API endpoint
         const API_URL = window.location.origin;
 
         // ==================== INITIALIZATION ====================
@@ -507,6 +554,9 @@
             createNumberGrid();
             loadGameSettings();
             updateSummary();
+            checkGameSession();
+            // Check session every 5 seconds
+            sessionCheckInterval = setInterval(checkGameSession, 5000);
         };
 
         // ==================== API FUNCTIONS ====================
@@ -518,11 +568,112 @@
                     gameSettings.gameType = data.game_type;
                     gameSettings.cardPrice = data.card_price;
                     gameSettings.prizeAmount = data.prize_pool;
-                    
-                    document.getElementById('currentGamePrize').innerText = data.prize_pool;
+                    gameSettings.minCardsToStart = data.min_cards_to_start || 10;
                 }
             } catch (error) {
                 console.log('Using default settings');
+            }
+        }
+
+        async function checkGameSession() {
+            try {
+                const response = await fetch(`${API_URL}/api/game/session`);
+                const data = await response.json();
+                if (data.success) {
+                    sessionInfo = {
+                        totalCardsSold: data.total_cards_sold,
+                        totalPlayers: data.total_players,
+                        prizePool: data.prize_pool,
+                        status: data.status
+                    };
+                    
+                    // Update UI
+                    document.getElementById('totalCardsSold').innerText = sessionInfo.totalCardsSold;
+                    document.getElementById('totalPlayers').innerText = sessionInfo.totalPlayers;
+                    document.getElementById('prizePool').innerText = sessionInfo.prizePool;
+                    
+                    let statusMsg = document.getElementById('statusMessage');
+                    let cardsNeeded = Math.max(0, gameSettings.minCardsToStart - sessionInfo.totalCardsSold);
+                    
+                    if (sessionInfo.status === 'waiting') {
+                        if (cardsNeeded > 0) {
+                            statusMsg.className = 'waiting-message';
+                            statusMsg.innerHTML = `⏳ Need ${cardsNeeded} more card${cardsNeeded > 1 ? 's' : ''} to start`;
+                        }
+                    } else if (sessionInfo.status === 'countdown') {
+                        if (!gameStarted) {
+                            statusMsg.className = 'ready-message';
+                            statusMsg.innerHTML = '🎮 Game is starting!';
+                            // Show countdown page if we're in it
+                            if (document.getElementById('gamePage').style.display !== 'block') {
+                                showCountdownPage();
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                console.log('Error checking session:', error);
+            }
+        }
+
+        async function purchaseCards() {
+            let count = Object.keys(selectedCards).length;
+            let total = count * gameSettings.cardPrice;
+            
+            if (count === 0) {
+                alert("Please select at least one card!");
+                return;
+            }
+            
+            if (playerBalance < total) {
+                alert(`Insufficient balance! Need ${total} ETB`);
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_URL}/api/game/purchase`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        user_id: userId,
+                        cards_bought: count,
+                        total_paid: total
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Update local balance
+                    playerBalance = data.new_balance;
+                    document.getElementById("playerBalance").innerText = playerBalance;
+                    
+                    // Update session info
+                    sessionInfo = {
+                        totalCardsSold: data.session.total_cards_sold,
+                        totalPlayers: data.session.total_players,
+                        prizePool: data.session.prize_pool
+                    };
+                    
+                    // Save cards for game
+                    currentGameCards = { ...selectedCards };
+                    
+                    alert(`✅ ${count} cards purchased!`);
+                    
+                    // Clear selection
+                    selectedCards = {};
+                    document.querySelectorAll(".box").forEach(b => b.classList.remove("selected"));
+                    updatePreview();
+                    updateSummary();
+                    
+                    if (data.game_ready) {
+                        // Game is ready to start
+                        showCountdownPage();
+                    }
+                }
+            } catch (error) {
+                console.error('Error purchasing cards:', error);
+                alert('Error processing purchase');
             }
         }
 
@@ -536,7 +687,7 @@
                 box.id = `card-${i}`;
 
                 box.onclick = () => {
-                    if (gameSettings.isGameActive) {
+                    if (gameStarted || gameSettings.isGameActive) {
                         alert("Game in progress!");
                         return;
                     }
@@ -591,13 +742,12 @@
             
             if (autoMarkEnabled) {
                 indicator.className = 'mode-indicator mode-auto';
-                indicator.innerHTML = '🔄 AUTO MARK MODE - Numbers mark automatically';
+                indicator.innerHTML = '🔄 AUTO MARK MODE';
             } else {
                 indicator.className = 'mode-indicator mode-manual';
-                indicator.innerHTML = '✋ MANUAL MARK MODE - Click cells to mark numbers';
+                indicator.innerHTML = '✋ MANUAL MARK MODE';
             }
             
-            // Show mode indicator briefly
             indicator.style.display = 'block';
             setTimeout(() => {
                 indicator.style.display = 'none';
@@ -607,13 +757,9 @@
         // ==================== IS NUMBER MARKED ====================
         function isNumberMarked(cardNum, number) {
             if (number === "FREE") return true;
-            
-            // In AUTO mode, numbers are marked if called
             if (autoMarkEnabled) {
                 return gameSettings.calledNumbers.includes(number);
             }
-            
-            // In MANUAL mode, check manually marked set
             return manuallyMarked[cardNum]?.has(number) || false;
         }
 
@@ -649,31 +795,25 @@
                 
                 if (n === "FREE") {
                     cell.classList.add("free");
-                    cell.classList.add("marked"); // FREE always marked
+                    cell.classList.add("marked");
                 } else {
-                    // Check if number should be marked based on mode
                     if (isNumberMarked(cardNumber, n)) {
                         cell.classList.add("marked");
                     }
                 }
                 
-                // Manual mark click handler
                 cell.onclick = function(e) {
                     e.stopPropagation();
                     
-                    // Can't mark FREE space
                     if (n === "FREE") {
-                        alert("FREE space is always marked!");
                         return;
                     }
                     
-                    // In AUTO mode, clicking doesn't do anything
                     if (autoMarkEnabled) {
                         alert("Switch to MANUAL mode to mark numbers yourself");
                         return;
                     }
                     
-                    // MANUAL mode: toggle mark
                     if (!manuallyMarked[cardNumber]) {
                         manuallyMarked[cardNumber] = new Set();
                     }
@@ -684,14 +824,9 @@
                     } else {
                         manuallyMarked[cardNumber].add(n);
                         this.classList.add("marked");
-                        // Add animation
-                        this.style.animation = 'none';
-                        this.offsetHeight; // trigger reflow
-                        this.style.animation = 'pulse 0.3s';
                     }
                 };
                 
-                // Highlight winning cells
                 if (gameSettings.winners.some(w => w.cardNumber == cardNumber && w.cells.includes(index))) {
                     cell.classList.add("winning-cell");
                 }
@@ -778,35 +913,32 @@
         }
 
         // ==================== CONFIRM CARDS ====================
-        async function confirmCards() {
-            let count = Object.keys(selectedCards).length;
-            let total = count * gameSettings.cardPrice;
-            
-            if (count === 0) {
-                alert("Please select at least one card!");
-                return;
+        function confirmCards() {
+            purchaseCards();
+        }
+
+        // ==================== CANCEL SELECTION ====================
+        function cancelSelection() {
+            if (Object.keys(selectedCards).length > 0) {
+                if (confirm("Clear all selections?")) {
+                    selectedCards = {};
+                    document.querySelectorAll(".box").forEach(b => b.classList.remove("selected"));
+                    updatePreview();
+                    updateSummary();
+                }
             }
+        }
+
+        // ==================== SHOW COUNTDOWN PAGE ====================
+        function showCountdownPage() {
+            document.getElementById("selectPage").style.display = "none";
+            document.getElementById("countdownPage").style.display = "block";
+            document.getElementById("gamePage").style.display = "none";
             
-            if (count < 10) {
-                alert(`❌ You need at least 10 cards to start a game!\nCurrent: ${count} cards`);
-                return;
-            }
+            document.getElementById('finalCardsSold').innerText = sessionInfo.totalCardsSold;
+            document.getElementById('finalPlayers').innerText = sessionInfo.totalPlayers;
+            document.getElementById('finalPrize').innerText = sessionInfo.prizePool;
             
-            if (playerBalance < total) {
-                alert(`Insufficient balance! Need ${total} ETB`);
-                return;
-            }
-            
-            playerBalance -= total;
-            document.getElementById("playerBalance").innerText = playerBalance;
-            
-            currentGameCards = { ...selectedCards };
-            
-            // Reset manually marked numbers
-            manuallyMarked = {};
-            
-            alert(`✅ ${count} cards purchased!\n⏱️ Game starts in 30 seconds...`);
-            showGamePage();
             startCountdown();
         }
 
@@ -814,12 +946,6 @@
         function startCountdown() {
             countdownValue = 30;
             document.getElementById('countdownNumber').innerText = countdownValue;
-            
-            // Hide game elements during countdown
-            document.getElementById('toggleSection').style.display = 'none';
-            document.getElementById('calledSection').style.display = 'none';
-            document.getElementById('modeIndicator').style.display = 'none';
-            document.getElementById('bingoBtn').disabled = true;
             
             countdownInterval = setInterval(() => {
                 countdownValue--;
@@ -838,42 +964,31 @@
 
         // ==================== START GAME ====================
         function startGame() {
-            // Hide countdown, show game elements
-            document.getElementById('countdownSection').style.display = 'none';
-            document.getElementById('toggleSection').style.display = 'flex';
-            document.getElementById('calledSection').style.display = 'block';
+            gameStarted = true;
             
-            // Show initial mode
+            document.getElementById('countdownPage').style.display = 'none';
+            document.getElementById('gamePage').style.display = 'block';
+            
             toggleMarkMode();
-            
-            // Start the game
             gameSettings.isGameActive = true;
+            
+            startTimer();
+            updateGameCards();
             startNumberCalls();
-        }
-
-        // ==================== CANCEL SELECTION ====================
-        function cancelSelection() {
-            if (Object.keys(selectedCards).length > 0) {
-                if (confirm("Cancel all selections?")) {
-                    selectedCards = {};
-                    document.querySelectorAll(".box").forEach(b => b.classList.remove("selected"));
-                    updatePreview();
-                    updateSummary();
-                }
-            }
         }
 
         // ==================== SHOW GAME PAGE ====================
         function showGamePage() {
             document.getElementById("selectPage").style.display = "none";
+            document.getElementById("countdownPage").style.display = "none";
             document.getElementById("gamePage").style.display = "block";
             
-            document.getElementById('countdownSection').style.display = 'block';
-            document.getElementById('toggleSection').style.display = 'none';
-            document.getElementById('calledSection').style.display = 'none';
+            toggleMarkMode();
+            gameSettings.isGameActive = true;
             
             startTimer();
             updateGameCards();
+            startNumberCalls();
         }
 
         // ==================== UPDATE GAME CARDS ====================
@@ -895,20 +1010,22 @@
             if (callInterval) clearInterval(callInterval);
             
             document.getElementById("selectPage").style.display = "block";
+            document.getElementById("countdownPage").style.display = "none";
             document.getElementById("gamePage").style.display = "none";
             
+            gameStarted = false;
             gameSettings.isGameActive = false;
             gameSettings.calledNumbers = [];
             gameSettings.winners = [];
             manuallyMarked = {};
         }
 
-        // ==================== CHECK FOR WIN (UPDATED) ====================
+        // ==================== CHECK FOR WIN ====================
         function checkForWin(cards) {
             for (let cardNum in cards) {
                 let card = cards[cardNum];
                 
-                // Check each cell to see if it's marked
+                // Check rows
                 for (let row = 0; row < 5; row++) {
                     let rowMarked = true;
                     let rowCells = [];
@@ -1027,17 +1144,14 @@
                 if (!gameSettings.calledNumbers.includes(num)) {
                     gameSettings.calledNumbers.push(num);
                     
-                    // Add to display
                     let list = document.getElementById('numbersList');
                     let ball = document.createElement('span');
                     ball.className = 'number-ball';
                     ball.innerText = num;
                     list.appendChild(ball);
                     
-                    // Update cards
                     updateGameCards();
                     
-                    // Enable Bingo button
                     document.getElementById('bingoBtn').disabled = false;
                     bingoButtonEnabled = true;
                 }
