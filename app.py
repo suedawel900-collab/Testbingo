@@ -3,6 +3,7 @@ import sqlite3
 import multiprocessing
 import logging
 import time
+import sys
 from datetime import datetime
 from flask import Flask, request, jsonify, render_template
 
@@ -20,8 +21,12 @@ ADMIN_ID = int(os.environ.get('ADMIN_ID', '0'))
 RAILWAY_URL = os.environ.get('RAILWAY_STATIC_URL', 'localhost:5000')
 APP_URL = f"https://{RAILWAY_URL}"
 
+# IMPORTANT: Only run bot in the main process, not in Gunicorn workers
+IS_MAIN_PROCESS = os.environ.get('RUN_MAIN') == 'true' or not os.environ.get('GUNICORN_WORKER_ID')
+
 logger.info(f"Starting with BOT_TOKEN: {BOT_TOKEN[:5] if BOT_TOKEN else 'None'}...")
 logger.info(f"APP_URL: {APP_URL}")
+logger.info(f"IS_MAIN_PROCESS: {IS_MAIN_PROCESS}")
 
 # ==================== DATABASE SETUP ====================
 def init_db():
@@ -106,7 +111,7 @@ def update_user_phone(telegram_id, phone_number):
     conn.close()
 
 def add_transaction(user_id, amount, tx_id):
-    """Add new transaction with amount first"""
+    """Add new transaction"""
     conn = sqlite3.connect('database/bingo.db')
     c = conn.cursor()
     receipt_url = f"https://transactioninfo.ethiotelecom.et/receipt/{tx_id}"
@@ -114,7 +119,6 @@ def add_transaction(user_id, amount, tx_id):
               (user_id, amount, tx_id, receipt_url))
     conn.commit()
     conn.close()
-    logger.info(f"Transaction added: {tx_id} for amount {amount} ETB")
 
 def approve_transaction(tx_id, admin_id):
     """Approve transaction and update user balance"""
@@ -137,7 +141,6 @@ def approve_transaction(tx_id, admin_id):
     
     conn.commit()
     conn.close()
-    logger.info(f"Transaction approved: {tx_id} for amount {amount} ETB")
     return telegram_id, amount
 
 # ==================== BOT PROCESS ====================
@@ -146,6 +149,7 @@ def run_bot_process():
     import asyncio
     from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
     from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler, ContextTypes
+    from telegram.error import Conflict
     
     logger.info(f"Bot process started with PID: {os.getpid()}")
     
@@ -277,7 +281,6 @@ def run_bot_process():
             )
         
         elif data == "deposit":
-            # Step 1: Ask for amount first
             await query.edit_message_text(
                 "💰 *Enter Deposit Amount*\n\n"
                 "Please enter the amount you want to deposit (in ETB):\n"
@@ -288,14 +291,12 @@ def run_bot_process():
             context.user_data['awaiting_amount'] = True
         
         elif data.startswith("approve_"):
-            # Admin approval
             if user.id != ADMIN_ID:
                 await query.edit_message_text("❌ Unauthorized")
                 return
             
             tx_id = data.replace("approve_", "")
             
-            # Approve transaction
             conn = sqlite3.connect('database/bingo.db')
             c = conn.cursor()
             c.execute('''UPDATE transactions SET status='approved', approved_by=?, approved_at=? WHERE tx_id=?''',
@@ -309,7 +310,6 @@ def run_bot_process():
             conn.commit()
             conn.close()
             
-            # Notify user
             await context.bot.send_message(
                 telegram_id, 
                 f"✅ *Deposit Approved!*\n\n"
@@ -320,25 +320,14 @@ def run_bot_process():
             
             await query.edit_message_text(
                 f"✅ *Deposit Approved*\n\n"
-                f"Amount: {amount} ETB\n"
-                f"User: {telegram_id}",
+                f"Amount: {amount} ETB",
                 parse_mode='Markdown'
             )
-        
-        elif data.startswith("reject_"):
-            if user.id != ADMIN_ID:
-                await query.edit_message_text("❌ Unauthorized")
-                return
-            
-            tx_id = data.replace("reject_", "")
-            await query.edit_message_text(f"❌ Deposit rejected")
     
     async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle text messages"""
         user = update.effective_user
         text = update.message.text.strip()
         
-        # Step 1: User enters amount
         if context.user_data.get('awaiting_amount'):
             try:
                 amount = int(text)
@@ -346,7 +335,6 @@ def run_bot_process():
                     await update.message.reply_text("❌ Minimum deposit is 50 ETB")
                     return
                 
-                # Store amount and ask for transaction ID
                 context.user_data['deposit_amount'] = amount
                 context.user_data['awaiting_amount'] = False
                 context.user_data['awaiting_tx'] = True
@@ -361,7 +349,6 @@ def run_bot_process():
             except ValueError:
                 await update.message.reply_text("❌ Please enter a valid number")
         
-        # Step 2: User enters transaction ID
         elif context.user_data.get('awaiting_tx'):
             tx_id = text.upper()
             amount = context.user_data.get('deposit_amount')
@@ -371,16 +358,13 @@ def run_bot_process():
                 context.user_data.clear()
                 return
             
-            # Get user from database
             db_user = bot_get_user(user.id)
             if not db_user:
                 await update.message.reply_text("❌ User not found. Please use /start")
                 return
             
-            # Save transaction
             bot_add_transaction(db_user[0], amount, tx_id)
             
-            # Notify admin
             keyboard = [[
                 InlineKeyboardButton("✅ Approve", callback_data=f"approve_{tx_id}"),
                 InlineKeyboardButton("❌ Reject", callback_data=f"reject_{tx_id}")
@@ -408,10 +392,9 @@ def run_bot_process():
                 parse_mode='Markdown'
             )
             
-            # Clear user data
             context.user_data.clear()
     
-    # Create and run application
+    # Create and run application with proper error handling
     try:
         bot_app = Application.builder().token(BOT_TOKEN).build()
         bot_app.add_handler(CommandHandler("start", start))
@@ -420,30 +403,59 @@ def run_bot_process():
         bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
         
         logger.info("Bot process starting polling...")
+        
+        # Run with error handling for conflicts
         bot_app.run_polling(drop_pending_updates=True)
         
+    except Conflict as e:
+        logger.error(f"Conflict error - another bot instance is running: {e}")
+        sys.exit(1)
     except Exception as e:
         logger.error(f"Bot process error: {e}")
         time.sleep(5)
 
-# ==================== START BOT PROCESS ====================
+# ==================== START BOT PROCESS (ONLY ONCE) ====================
 bot_process = None
 
 def start_bot_process():
-    """Start the bot in a separate process"""
+    """Start the bot in a separate process - ONLY ONCE"""
     global bot_process
+    
+    # Only start bot in the main process, not in Gunicorn workers
+    if not IS_MAIN_PROCESS:
+        logger.info("Skipping bot start in Gunicorn worker")
+        return
+    
+    # Check if already running
     if bot_process and bot_process.is_alive():
         logger.info("Bot process already running")
         return
     
+    # Kill any existing bot processes
+    try:
+        import psutil
+        current_pid = os.getpid()
+        for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+            try:
+                if 'python' in proc.info['name'] and 'bot' in str(proc.info['cmdline']).lower():
+                    if proc.info['pid'] != current_pid:
+                        logger.info(f"Killing old bot process: {proc.info['pid']}")
+                        proc.kill()
+            except:
+                pass
+    except:
+        pass
+    
+    # Start new bot process
     bot_process = multiprocessing.Process(target=run_bot_process, daemon=True)
     bot_process.start()
     logger.info(f"Bot process started with PID: {bot_process.pid}")
 
-if BOT_TOKEN:
+# Start bot ONLY in main process
+if BOT_TOKEN and IS_MAIN_PROCESS:
     start_bot_process()
 else:
-    logger.error("BOT_TOKEN not set!")
+    logger.info("Bot not started - not main process or no token")
 
 # ==================== FLASK ROUTES ====================
 @application.route('/')
@@ -474,7 +486,6 @@ def get_user_data(telegram_id):
 
 @application.route('/api/game/session')
 def get_game_session():
-    """Get current game session info"""
     return jsonify({
         'success': True,
         'total_cards_sold': 0,
@@ -485,9 +496,7 @@ def get_game_session():
 
 @application.route('/api/game/purchase', methods=['POST'])
 def purchase_cards():
-    """Handle card purchase"""
     data = request.json
-    # Add purchase logic here
     return jsonify({
         'success': True,
         'new_balance': 1000,
@@ -499,6 +508,7 @@ def health():
     return jsonify({
         'status': 'ok',
         'bot_process': bot_process.is_alive() if bot_process else False,
+        'is_main_process': IS_MAIN_PROCESS,
         'url': APP_URL
     })
 
