@@ -1,7 +1,6 @@
 import os
 import sqlite3
 import asyncio
-import threading
 import logging
 from datetime import datetime
 from flask import Flask, request, jsonify, render_template
@@ -79,6 +78,21 @@ def create_user(telegram_id, username, first_name):
     finally:
         conn.close()
 
+def update_user_phone(telegram_id, phone_number):
+    """Update user's phone number"""
+    conn = sqlite3.connect('database/bingo.db')
+    c = conn.cursor()
+    try:
+        c.execute("UPDATE users SET phone_number = ? WHERE telegram_id = ?",
+                  (phone_number, telegram_id))
+        conn.commit()
+        return True
+    except Exception as e:
+        logger.error(f"Error updating phone: {e}")
+        return False
+    finally:
+        conn.close()
+
 # ==================== BOT HANDLERS ====================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /start command"""
@@ -90,6 +104,21 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not db_user:
         create_user(user.id, user.username, user.first_name)
         db_user = get_user(user.id)
+    
+    # Check if phone number is needed
+    if not db_user['phone_number']:
+        # Ask for phone number
+        contact_keyboard = [
+            [KeyboardButton("📱 Share Phone Number", request_contact=True)],
+            [KeyboardButton("❌ Skip")]
+        ]
+        reply_markup = ReplyKeyboardMarkup(contact_keyboard, resize_keyboard=True, one_time_keyboard=True)
+        
+        await update.message.reply_text(
+            "📱 Please share your phone number:",
+            reply_markup=reply_markup
+        )
+        return
     
     # Create web app button
     keyboard = [[InlineKeyboardButton(
@@ -111,53 +140,54 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if contact and contact.user_id == user.id:
         # Save phone number
-        conn = sqlite3.connect('database/bingo.db')
-        c = conn.cursor()
-        c.execute("UPDATE users SET phone_number = ? WHERE telegram_id = ?",
-                  (contact.phone_number, user.id))
-        conn.commit()
-        conn.close()
-        
-        await update.message.reply_text(f"✅ Phone number saved: {contact.phone_number}")
+        if update_user_phone(user.id, contact.phone_number):
+            await update.message.reply_text(f"✅ Phone number saved!")
+            
+            # Now send the play button
+            db_user = get_user(user.id)
+            keyboard = [[InlineKeyboardButton(
+                "🎮 PLAY BINGO",
+                web_app={"url": f"{APP_URL}/game?user={user.id}"}
+            )]]
+            
+            await update.message.reply_text(
+                f"🎰 You can now play!",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+        else:
+            await update.message.reply_text("❌ Error saving phone number")
     else:
         await update.message.reply_text("❌ Please share your own contact")
 
-# ==================== FIXED BOT SETUP with proper asyncio ====================
-def run_bot():
-    """Run bot in separate thread with proper event loop"""
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle regular messages"""
+    await update.message.reply_text("Please use /start to begin")
+
+# ==================== BOT SETUP - RUN IN MAIN THREAD ====================
+def setup_bot():
+    """Setup and run bot in the main thread"""
     if not BOT_TOKEN:
         logger.error("No BOT_TOKEN")
-        return
+        return None
     
     try:
-        # Create new event loop for this thread
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        
         # Create application
         bot_app = Application.builder().token(BOT_TOKEN).build()
         
         # Add handlers
         bot_app.add_handler(CommandHandler("start", start))
         bot_app.add_handler(MessageHandler(filters.CONTACT, handle_contact))
+        bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
         
-        logger.info("Starting bot...")
-        
-        # Run the bot in this thread's event loop
-        bot_app.run_polling(drop_pending_updates=True)
+        logger.info("Bot setup complete")
+        return bot_app
         
     except Exception as e:
-        logger.error(f"Bot error: {e}")
-    finally:
-        loop.close()
+        logger.error(f"Bot setup error: {e}")
+        return None
 
-# Start bot in thread
-if BOT_TOKEN:
-    bot_thread = threading.Thread(target=run_bot, daemon=True)
-    bot_thread.start()
-    logger.info("Bot thread started")
-else:
-    logger.error("BOT_TOKEN not set!")
+# Initialize bot app
+bot_app = setup_bot()
 
 # ==================== FLASK ROUTES ====================
 @application.route('/')
@@ -168,13 +198,15 @@ def index():
 def game():
     user_id = request.args.get('user', 'guest')
     balance = 1000
+    phone = ''
     
     if user_id != 'guest':
         user = get_user(int(user_id))
         if user:
             balance = user['balance']
+            phone = user['phone_number'] or ''
     
-    return render_template('index.html', user_id=user_id, balance=balance)
+    return render_template('index.html', user_id=user_id, balance=balance, phone=phone)
 
 @application.route('/api/user/<int:telegram_id>')
 def get_user_data(telegram_id):
@@ -191,10 +223,26 @@ def get_user_data(telegram_id):
 def health():
     return jsonify({
         'status': 'ok',
-        'bot': 'running' if BOT_TOKEN else 'no token'
+        'bot': 'configured' if BOT_TOKEN else 'no token'
     })
 
 # ==================== MAIN ====================
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
+    
+    # Start bot polling in background thread with proper event loop
+    if bot_app:
+        import threading
+        def run_bot():
+            try:
+                logger.info("Starting bot polling...")
+                bot_app.run_polling(drop_pending_updates=True)
+            except Exception as e:
+                logger.error(f"Bot polling error: {e}")
+        
+        bot_thread = threading.Thread(target=run_bot, daemon=True)
+        bot_thread.start()
+        logger.info("Bot thread started")
+    
+    # Run Flask
     application.run(host='0.0.0.0', port=port)
