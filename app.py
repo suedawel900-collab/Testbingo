@@ -11,14 +11,14 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 logger = logging.getLogger(__name__)
 
 # ==================== FLASK APP ====================
-application = Flask(__name__)  # CRITICAL: Named 'application' for Gunicorn
+application = Flask(__name__)
 app = application
 
 # Configuration
 BOT_TOKEN = os.environ.get('BOT_TOKEN')
 ADMIN_ID = int(os.environ.get('ADMIN_ID', '0'))
 RAILWAY_URL = os.environ.get('RAILWAY_STATIC_URL', 'localhost:5000')
-APP_URL = f"https://{RAILWAY_URL}"  # Add https://
+APP_URL = f"https://{RAILWAY_URL}"
 
 logger.info(f"Starting with BOT_TOKEN: {BOT_TOKEN[:5] if BOT_TOKEN else 'None'}...")
 logger.info(f"APP_URL: {APP_URL}")
@@ -48,8 +48,8 @@ def init_db():
     c.execute('''CREATE TABLE IF NOT EXISTS transactions
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   user_id INTEGER,
-                  tx_id TEXT UNIQUE,
                   amount INTEGER DEFAULT 0,
+                  tx_id TEXT UNIQUE,
                   status TEXT DEFAULT 'pending',
                   receipt_url TEXT,
                   approved_by INTEGER,
@@ -105,15 +105,16 @@ def update_user_phone(telegram_id, phone_number):
     conn.commit()
     conn.close()
 
-def add_transaction(user_id, tx_id, amount):
-    """Add new transaction"""
+def add_transaction(user_id, amount, tx_id):
+    """Add new transaction with amount first"""
     conn = sqlite3.connect('database/bingo.db')
     c = conn.cursor()
     receipt_url = f"https://transactioninfo.ethiotelecom.et/receipt/{tx_id}"
-    c.execute("INSERT INTO transactions (user_id, tx_id, amount, receipt_url) VALUES (?, ?, ?, ?)",
-              (user_id, tx_id, amount, receipt_url))
+    c.execute("INSERT INTO transactions (user_id, amount, tx_id, receipt_url) VALUES (?, ?, ?, ?)",
+              (user_id, amount, tx_id, receipt_url))
     conn.commit()
     conn.close()
+    logger.info(f"Transaction added: {tx_id} for amount {amount} ETB")
 
 def approve_transaction(tx_id, admin_id):
     """Approve transaction and update user balance"""
@@ -136,6 +137,7 @@ def approve_transaction(tx_id, admin_id):
     
     conn.commit()
     conn.close()
+    logger.info(f"Transaction approved: {tx_id} for amount {amount} ETB")
     return telegram_id, amount
 
 # ==================== BOT PROCESS ====================
@@ -172,7 +174,16 @@ def run_bot_process():
         conn.commit()
         conn.close()
     
-    # Bot handlers
+    def bot_add_transaction(user_id, amount, tx_id):
+        conn = sqlite3.connect('database/bingo.db')
+        c = conn.cursor()
+        receipt_url = f"https://transactioninfo.ethiotelecom.et/receipt/{tx_id}"
+        c.execute("INSERT INTO transactions (user_id, amount, tx_id, receipt_url) VALUES (?, ?, ?, ?)",
+                  (user_id, amount, tx_id, receipt_url))
+        conn.commit()
+        conn.close()
+    
+    # ==================== BOT HANDLERS ====================
     async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user = update.effective_user
         logger.info(f"Start from {user.first_name}")
@@ -203,7 +214,8 @@ def run_bot_process():
             [
                 InlineKeyboardButton("💰 DEPOSIT", callback_data="deposit"),
                 InlineKeyboardButton("📊 STATS", callback_data="stats")
-            ]
+            ],
+            [InlineKeyboardButton("💳 BALANCE", callback_data="balance")]
         ]
         
         await update.message.reply_text(
@@ -227,7 +239,8 @@ def run_bot_process():
                 [
                     InlineKeyboardButton("💰 DEPOSIT", callback_data="deposit"),
                     InlineKeyboardButton("📊 STATS", callback_data="stats")
-                ]
+                ],
+                [InlineKeyboardButton("💳 BALANCE", callback_data="balance")]
             ]
             
             await update.message.reply_text(
@@ -242,27 +255,47 @@ def run_bot_process():
         await query.answer()
         
         data = query.data
+        user = query.from_user
         
-        if data == "deposit":
-            await query.edit_message_text("💰 Send your Telebirr Transaction ID:")
-            context.user_data['awaiting_tx'] = True
-        
-        elif data == "stats":
-            db_user = bot_get_user(query.from_user.id)
+        if data == "balance":
+            db_user = bot_get_user(user.id)
             await query.edit_message_text(
-                f"📊 Your Stats:\n"
-                f"Balance: {db_user[4]} ETB\n"
-                f"Games: {db_user[5]}\n"
-                f"Wins: {db_user[6]} ETB"
+                f"💳 *Your Balance*\n\n"
+                f"Available: *{db_user[4]} ETB*\n"
+                f"Total Deposits: *{db_user[7]} ETB*",
+                parse_mode='Markdown'
             )
         
+        elif data == "stats":
+            db_user = bot_get_user(user.id)
+            await query.edit_message_text(
+                f"📊 *Your Stats*\n\n"
+                f"Balance: *{db_user[4]} ETB*\n"
+                f"Games Played: *{db_user[5]}*\n"
+                f"Wins: *{db_user[6]} ETB*",
+                parse_mode='Markdown'
+            )
+        
+        elif data == "deposit":
+            # Step 1: Ask for amount first
+            await query.edit_message_text(
+                "💰 *Enter Deposit Amount*\n\n"
+                "Please enter the amount you want to deposit (in ETB):\n"
+                "Minimum: 50 ETB\n\n"
+                "Example: `100`",
+                parse_mode='Markdown'
+            )
+            context.user_data['awaiting_amount'] = True
+        
         elif data.startswith("approve_"):
-            if query.from_user.id != ADMIN_ID:
+            # Admin approval
+            if user.id != ADMIN_ID:
                 await query.edit_message_text("❌ Unauthorized")
                 return
             
             tx_id = data.replace("approve_", "")
             
+            # Approve transaction
             conn = sqlite3.connect('database/bingo.db')
             c = conn.cursor()
             c.execute('''UPDATE transactions SET status='approved', approved_by=?, approved_at=? WHERE tx_id=?''',
@@ -276,47 +309,107 @@ def run_bot_process():
             conn.commit()
             conn.close()
             
-            await context.bot.send_message(telegram_id, f"✅ Deposit of {amount} ETB approved!")
-            await query.edit_message_text("✅ Approved")
+            # Notify user
+            await context.bot.send_message(
+                telegram_id, 
+                f"✅ *Deposit Approved!*\n\n"
+                f"Amount: *{amount} ETB*\n"
+                f"Transaction ID: `{tx_id}`",
+                parse_mode='Markdown'
+            )
+            
+            await query.edit_message_text(
+                f"✅ *Deposit Approved*\n\n"
+                f"Amount: {amount} ETB\n"
+                f"User: {telegram_id}",
+                parse_mode='Markdown'
+            )
+        
+        elif data.startswith("reject_"):
+            if user.id != ADMIN_ID:
+                await query.edit_message_text("❌ Unauthorized")
+                return
+            
+            tx_id = data.replace("reject_", "")
+            await query.edit_message_text(f"❌ Deposit rejected")
     
     async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if context.user_data.get('awaiting_tx'):
-            tx_id = update.message.text.strip().upper()
-            await update.message.reply_text("💰 Enter amount:")
-            context.user_data['awaiting_tx'] = False
-            context.user_data['temp_tx'] = tx_id
-            context.user_data['awaiting_amount'] = True
+        """Handle text messages"""
+        user = update.effective_user
+        text = update.message.text.strip()
         
-        elif context.user_data.get('awaiting_amount'):
+        # Step 1: User enters amount
+        if context.user_data.get('awaiting_amount'):
             try:
-                amount = int(update.message.text.strip())
-                tx_id = context.user_data['temp_tx']
-                user = update.effective_user
+                amount = int(text)
+                if amount < 50:
+                    await update.message.reply_text("❌ Minimum deposit is 50 ETB")
+                    return
                 
-                db_user = bot_get_user(user.id)
+                # Store amount and ask for transaction ID
+                context.user_data['deposit_amount'] = amount
+                context.user_data['awaiting_amount'] = False
+                context.user_data['awaiting_tx'] = True
                 
-                conn = sqlite3.connect('database/bingo.db')
-                c = conn.cursor()
-                receipt_url = f"https://transactioninfo.ethiotelecom.et/receipt/{tx_id}"
-                c.execute("INSERT INTO transactions (user_id, tx_id, amount, receipt_url) VALUES (?, ?, ?, ?)",
-                         (db_user[0], tx_id, amount, receipt_url))
-                conn.commit()
-                conn.close()
-                
-                # Notify admin
-                keyboard = [[InlineKeyboardButton("✅ Approve", callback_data=f"approve_{tx_id}")]]
-                
-                await context.bot.send_message(
-                    ADMIN_ID,
-                    f"Deposit from @{user.username}\nAmount: {amount} ETB\nTX: {tx_id}",
-                    reply_markup=InlineKeyboardMarkup(keyboard)
+                await update.message.reply_text(
+                    "💰 *Enter Transaction ID*\n\n"
+                    "Please send the Telebirr transaction ID you received:\n\n"
+                    "Example: `DC39E2J9ZP`",
+                    parse_mode='Markdown'
                 )
                 
-                await update.message.reply_text("Deposit request sent to admin.")
-                context.user_data.clear()
-                
             except ValueError:
-                await update.message.reply_text("❌ Invalid amount")
+                await update.message.reply_text("❌ Please enter a valid number")
+        
+        # Step 2: User enters transaction ID
+        elif context.user_data.get('awaiting_tx'):
+            tx_id = text.upper()
+            amount = context.user_data.get('deposit_amount')
+            
+            if not amount:
+                await update.message.reply_text("❌ Please start over with /start")
+                context.user_data.clear()
+                return
+            
+            # Get user from database
+            db_user = bot_get_user(user.id)
+            if not db_user:
+                await update.message.reply_text("❌ User not found. Please use /start")
+                return
+            
+            # Save transaction
+            bot_add_transaction(db_user[0], amount, tx_id)
+            
+            # Notify admin
+            keyboard = [[
+                InlineKeyboardButton("✅ Approve", callback_data=f"approve_{tx_id}"),
+                InlineKeyboardButton("❌ Reject", callback_data=f"reject_{tx_id}")
+            ]]
+            
+            receipt_url = f"https://transactioninfo.ethiotelecom.et/receipt/{tx_id}"
+            
+            await context.bot.send_message(
+                ADMIN_ID,
+                f"💰 *New Deposit Request*\n\n"
+                f"👤 User: @{user.username or 'No username'}\n"
+                f"🆔 ID: {user.id}\n"
+                f"💳 Amount: *{amount} ETB*\n"
+                f"🔑 TX ID: `{tx_id}`\n\n"
+                f"[View Receipt]({receipt_url})",
+                parse_mode='Markdown',
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+            
+            await update.message.reply_text(
+                f"✅ *Deposit Request Sent!*\n\n"
+                f"Amount: *{amount} ETB*\n"
+                f"Transaction ID: `{tx_id}`\n\n"
+                f"Admin will approve within 5 minutes.",
+                parse_mode='Markdown'
+            )
+            
+            # Clear user data
+            context.user_data.clear()
     
     # Create and run application
     try:
@@ -331,7 +424,7 @@ def run_bot_process():
         
     except Exception as e:
         logger.error(f"Bot process error: {e}")
-        time.sleep(5)  # Wait before restarting
+        time.sleep(5)
 
 # ==================== START BOT PROCESS ====================
 bot_process = None
@@ -347,7 +440,6 @@ def start_bot_process():
     bot_process.start()
     logger.info(f"Bot process started with PID: {bot_process.pid}")
 
-# Start bot if token exists
 if BOT_TOKEN:
     start_bot_process()
 else:
@@ -380,25 +472,35 @@ def get_user_data(telegram_id):
         })
     return jsonify({'success': False, 'error': 'Not found'}), 404
 
+@application.route('/api/game/session')
+def get_game_session():
+    """Get current game session info"""
+    return jsonify({
+        'success': True,
+        'total_cards_sold': 0,
+        'total_players': 0,
+        'prize_pool': 0,
+        'status': 'waiting'
+    })
+
+@application.route('/api/game/purchase', methods=['POST'])
+def purchase_cards():
+    """Handle card purchase"""
+    data = request.json
+    # Add purchase logic here
+    return jsonify({
+        'success': True,
+        'new_balance': 1000,
+        'game_ready': False
+    })
+
 @application.route('/health')
 def health():
     return jsonify({
         'status': 'ok',
         'bot_process': bot_process.is_alive() if bot_process else False,
-        'bot_pid': bot_process.pid if bot_process else None,
         'url': APP_URL
     })
-
-@application.route('/bot-status')
-def bot_status():
-    """Check and restart bot if needed"""
-    global bot_process
-    if not bot_process or not bot_process.is_alive():
-        if BOT_TOKEN:
-            start_bot_process()
-            return jsonify({'status': 'restarting'})
-        return jsonify({'status': 'no token'})
-    return jsonify({'status': 'running', 'pid': bot_process.pid})
 
 # ==================== MAIN ====================
 if __name__ == '__main__':
