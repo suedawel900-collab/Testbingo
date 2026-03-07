@@ -1,231 +1,443 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <title>MK BINGO - ተጫዋች ዳሽቦርድ</title>
+    <style>
+        body {
+            font-family: Arial;
+            background: linear-gradient(135deg, #6a5acd, #1e90ff);
+            color: white;
+            text-align: center;
+            margin: 0;
+            padding: 20px;
+        }
 
-<title>MK BINGO</title>
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
 
-<style>
+        h3 {
+            font-size: 1.5em;
+            margin: 20px 0;
+        }
 
-body{
-font-family:Arial;
-background:linear-gradient(135deg,#6a5acd,#1e90ff);
-color:white;
-text-align:center;
-margin:0;
-}
+        /* የተጫዋች ብር መጠን */
+        .balance-box {
+            background: rgba(255,255,255,0.2);
+            padding: 20px;
+            border-radius: 15px;
+            max-width: 300px;
+            margin: 20px auto;
+            border: 2px solid white;
+        }
 
-#grid{
-display:grid;
-grid-template-columns:repeat(auto-fill,minmax(35px,1fr));
-gap:5px;
-max-width:900px;
-margin:auto;
-padding:20px;
-}
+        .balance-box h2 {
+            font-size: 2em;
+            margin: 0;
+        }
 
-.box{
-background:white;
-color:black;
-font-size:12px;
-padding:7px;
-border-radius:6px;
-cursor:pointer;
-}
+        .balance-box span {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #ffd700;
+        }
 
-.box:hover{
-background:#ffd700;
-}
+        /* ከ1-1000 ቁጥሮች ግሪድ */
+        #grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+            gap: 5px;
+            max-width: 1000px;
+            margin: auto;
+            padding: 20px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+        }
 
-.selected{
-background:#32cd32;
-color:white;
-}
+        .box {
+            background: white;
+            color: black;
+            font-size: 12px;
+            padding: 8px 4px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid #999;
+        }
 
-#preview{
-margin:20px;
-}
+        .box:hover {
+            background: #ffd700;
+            transform: scale(1.1);
+        }
 
-.previewCard{
-background:#ffffff22;
-padding:10px;
-border-radius:10px;
-display:inline-block;
-margin:10px;
-}
+        .selected {
+            background: #32cd32;
+            color: white;
+            font-weight: bold;
+        }
 
-.gridCard{
-display:grid;
-grid-template-columns:repeat(5,40px);
-gap:5px;
-}
+        /* የካርድ ቅድመ-እይታ */
+        #preview {
+            margin: 30px auto;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+            max-width: 1000px;
+        }
 
-.cell{
-background:white;
-color:black;
-padding:10px;
-border-radius:5px;
-font-weight:bold;
-}
+        .previewCard {
+            background: rgba(255,255,255,0.15);
+            padding: 15px;
+            border-radius: 15px;
+            display: inline-block;
+            margin: 10px;
+            border: 2px solid white;
+        }
 
-button{
-padding:12px 30px;
-font-size:18px;
-border:none;
-border-radius:10px;
-background:#00c853;
-color:white;
-cursor:pointer;
-margin:20px;
-}
+        .previewCard h4 {
+            margin: 0 0 10px 0;
+            color: #ffd700;
+        }
 
-#gamePage{
-display:none;
-}
+        .gridCard {
+            display: grid;
+            grid-template-columns: repeat(5, 45px);
+            gap: 5px;
+        }
 
-</style>
+        .cell {
+            background: white;
+            color: black;
+            padding: 10px 5px;
+            border-radius: 5px;
+            font-weight: bold;
+            font-size: 14px;
+            text-align: center;
+        }
 
+        .cell.free {
+            background: #ffd700;
+        }
+
+        /* ቁልፎች */
+        button {
+            padding: 15px 50px;
+            font-size: 20px;
+            border: none;
+            border-radius: 50px;
+            background: #00c853;
+            color: white;
+            cursor: pointer;
+            margin: 20px;
+            font-weight: bold;
+            transition: all 0.2s;
+            border: 2px solid white;
+        }
+
+        button:hover {
+            background: #009624;
+            transform: scale(1.05);
+        }
+
+        .cancel-btn {
+            background: #d32f2f;
+        }
+
+        .cancel-btn:hover {
+            background: #b71c1c;
+        }
+
+        /* የጨዋታ ገጽ */
+        #gamePage {
+            display: none;
+            margin-top: 30px;
+        }
+
+        #gameCards {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+            max-width: 1200px;
+            margin: auto;
+        }
+
+        .game-card {
+            background: rgba(255,255,255,0.15);
+            padding: 20px;
+            border-radius: 15px;
+            border: 2px solid white;
+        }
+
+        .game-card h3 {
+            margin: 0 0 15px 0;
+            color: #ffd700;
+        }
+
+        /* ማስታወሻ */
+        .note {
+            color: rgba(255,255,255,0.8);
+            font-size: 14px;
+            margin-top: 20px;
+        }
+    </style>
 </head>
-
 <body>
+    <h1>🎰 MK BINGO</h1>
 
-<h1>🎮 MK BINGO</h1>
+    <!-- የተጫዋች ብር መጠን (እንደ ምስሉ) -->
+    <div class="balance-box">
+        <h2>ጠር: <span id="playerBalance">1000</span></h2>
+    </div>
 
-<div id="selectPage">
+    <!-- ካርድ የሚመረጥበት ገጽ -->
+    <div id="selectPage">
+        <h3>🎫 ካርዶች ይምረጡ (1-1000)</h3>
 
-<h3>Select Cards (1-1000)</h3>
+        <!-- ከ1-1000 ቁጥሮች ግሪድ -->
+        <div id="grid"></div>
 
-<div id="grid"></div>
+        <!-- የተመረጡ ካርዶች ቅድመ-እይታ -->
+        <h2>📋 የተመረጡ ካርዶች</h2>
+        <div id="preview"></div>
 
-<h2>Card Preview</h2>
+        <!-- የተመረጡ ካርዶች ብዛት እና ዋጋ -->
+        <div style="font-size: 1.2em; margin: 10px;">
+            <span>የተመረጡ ካርዶች: <span id="selectedCount">0</span></span>
+            <span style="margin-left: 30px;">ጠቅላላ ዋጋ: <span id="totalPrice">0</span> ጠር</span>
+        </div>
 
-<div id="preview"></div>
+        <!-- Confirm እና Cancel ቁልፎች -->
+        <button onclick="confirmCards()">✅ Confirm & Join Game</button>
+        <button class="cancel-btn" onclick="cancelSelection()">❌ Cancel</button>
+    </div>
 
-<button onclick="confirmCards()">Confirm & Join Game</button>
+    <!-- የጨዋታ ገጽ (ከተረጋገጠ በኋላ) -->
+    <div id="gamePage">
+        <h2>🎯 የጨዋታ ገጽ</h2>
+        <div id="gameCards"></div>
+        <button onclick="backToSelection()">🔙 ወደ ካርድ ምርጫ</button>
+    </div>
 
-</div>
+    <div class="note">
+        * ካርድ ለመምረጥ በቁጥሮች ላይ ጠቅ ያድርጉ<br>
+        * ከተመረጠ በኋላ ከታች ይታያል
+    </div>
 
-<div id="gamePage">
+    <script>
+        // ==================== ዳታ ====================
+        let selectedCards = {};  // የተመረጡ ካርዶች
+        let playerBalance = 1000;  // የተጫዋች ብር (እንደ ምስሉ)
+        let cardPrice = 10;  // የአንድ ካርድ ዋጋ
 
-<h2>Game Page</h2>
+        let grid = document.getElementById("grid");
+        let preview = document.getElementById("preview");
+        let selectedCountSpan = document.getElementById("selectedCount");
+        let totalPriceSpan = document.getElementById("totalPrice");
+        let balanceSpan = document.getElementById("playerBalance");
 
-<div id="gameCards"></div>
+        // ==================== 1. ከ1-1000 ቁጥሮች ፍጠር ====================
+        for (let i = 1; i <= 1000; i++) {
+            let d = document.createElement("div");
+            d.className = "box";
+            d.innerText = i;
+            d.id = `card-${i}`;
 
-</div>
+            // ቁጥር ሲጫን
+            d.onclick = () => {
+                if (selectedCards[i]) {
+                    // አስወግድ
+                    delete selectedCards[i];
+                    d.classList.remove("selected");
+                } else {
+                    // አክል
+                    selectedCards[i] = generateCard(i);  // ካርድ ፍጠር
+                    d.classList.add("selected");
+                }
 
-<script>
+                updatePreview();
+                updateSummary();
+            };
 
-let selectedCards={}
-let grid=document.getElementById("grid")
+            grid.appendChild(d);
+        }
 
-for(let i=1;i<=1000;i++){
+        // ==================== 2. የቢንጎ ካርድ ፍጠር ====================
+        function generateCard(cardNumber) {
+            let nums = [];
+            
+            // በካርድ ቁጥር መሰረት የተለየ ካርድ
+            let seed = cardNumber || Math.floor(Math.random() * 1000);
+            
+            // B (1-15), I (16-30), N (31-45), G (46-60), O (61-75)
+            for (let col = 0; col < 5; col++) {
+                let min = col * 15 + 1;
+                let max = (col + 1) * 15;
+                
+                // በእያንዳንዱ አምድ 5 የተለያዩ ቁጥሮች
+                let colNumbers = [];
+                while (colNumbers.length < 5) {
+                    // በ seed እና በካርድ ቁጥር ላይ የተመሰረተ ቁጥር
+                    let n = ((seed * (col + 1) + colNumbers.length * 7) % (max - min + 1)) + min;
+                    if (!colNumbers.includes(n)) {
+                        colNumbers.push(n);
+                    }
+                }
+                nums.push(...colNumbers);
+            }
+            
+            // መካከለኛውን (12ኛውን) ነፃ አድርግ
+            nums[12] = "FREE";
+            
+            return nums;
+        }
 
-let d=document.createElement("div")
-d.className="box"
-d.innerText=i
+        // ==================== 3. ካርድ አሳይ (preview) ====================
+        function createCard(card, cardNumber) {
+            let div = document.createElement("div");
+            div.className = "previewCard";
 
-d.onclick=()=>{
+            // የካርድ ቁጥር
+            let title = document.createElement("h4");
+            title.innerText = `ካርድ #${cardNumber}`;
+            div.appendChild(title);
 
-if(selectedCards[i]){
+            // 5x5 ግሪድ
+            let grid = document.createElement("div");
+            grid.className = "gridCard";
 
-delete selectedCards[i]
-d.classList.remove("selected")
+            card.forEach(n => {
+                let c = document.createElement("div");
+                c.className = "cell";
+                if (n === "FREE") {
+                    c.classList.add("free");
+                }
+                c.innerText = n;
+                grid.appendChild(c);
+            });
 
-}else{
+            div.appendChild(grid);
+            return div;
+        }
 
-selectedCards[i]=generateCard()
-d.classList.add("selected")
+        // ==================== 4. Preview አዘምን ====================
+        function updatePreview() {
+            preview.innerHTML = "";
+            
+            // የተመረጡ ካርዶችን አሳይ
+            for (let cardNum in selectedCards) {
+                let card = createCard(selectedCards[cardNum], cardNum);
+                preview.appendChild(card);
+            }
+        }
 
-}
+        // ==================== 5. ማጠቃለያ አዘምን ====================
+        function updateSummary() {
+            let count = Object.keys(selectedCards).length;
+            let total = count * cardPrice;
+            
+            selectedCountSpan.innerText = count;
+            totalPriceSpan.innerText = total;
+            
+            // በቂ ብር ካለ ማረጋገጥ
+            if (playerBalance < total) {
+                document.querySelector("button").disabled = true;
+                document.querySelector("button").style.opacity = "0.5";
+            } else {
+                document.querySelector("button").disabled = false;
+                document.querySelector("button").style.opacity = "1";
+            }
+        }
 
-updatePreview()
+        // ==================== 6. Confirm ====================
+        function confirmCards() {
+            let count = Object.keys(selectedCards).length;
+            let total = count * cardPrice;
+            
+            if (count === 0) {
+                alert("እባክዎ ቢያንስ አንድ ካርድ ይምረጡ!");
+                return;
+            }
+            
+            if (playerBalance < total) {
+                alert(`በቂ ጠር የለዎትም!\nያለዎት: ${playerBalance} ጠር\nየሚፈለግ: ${total} ጠር`);
+                return;
+            }
+            
+            // ብር ቀንስ
+            playerBalance -= total;
+            balanceSpan.innerText = playerBalance;
+            
+            // የተመረጡ ካርዶችን አስቀምጥ
+            localStorage.setItem('selectedCards', JSON.stringify(selectedCards));
+            localStorage.setItem('playerBalance', playerBalance);
+            
+            alert(`✅ ${count} ካርዶች ተመርጠዋል!\nጠቅላላ ክፍያ: ${total} ጠር`);
+            
+            // ወደ ጨዋታ ገጽ ሂድ
+            showGamePage();
+        }
 
-}
+        // ==================== 7. Cancel ====================
+        function cancelSelection() {
+            if (Object.keys(selectedCards).length > 0) {
+                if (confirm("እርግጠኛ ነዎት መሰረዝ ይፈልጋሉ? ሁሉም ምርጫዎች ይጠፋሉ።")) {
+                    selectedCards = {};
+                    document.querySelectorAll(".box").forEach(b => b.classList.remove("selected"));
+                    updatePreview();
+                    updateSummary();
+                }
+            }
+        }
 
-grid.appendChild(d)
+        // ==================== 8. የጨዋታ ገጽ አሳይ ====================
+        function showGamePage() {
+            document.getElementById("selectPage").style.display = "none";
+            document.getElementById("gamePage").style.display = "block";
+            
+            let game = document.getElementById("gameCards");
+            game.innerHTML = "";
+            
+            // የተመረጡ ካርዶችን አሳይ
+            for (let cardNum in selectedCards) {
+                let cardDiv = document.createElement("div");
+                cardDiv.className = "game-card";
+                
+                let title = document.createElement("h3");
+                title.innerText = `ካርድ #${cardNum}`;
+                cardDiv.appendChild(title);
+                
+                let grid = document.createElement("div");
+                grid.className = "gridCard";
+                
+                selectedCards[cardNum].forEach(n => {
+                    let c = document.createElement("div");
+                    c.className = "cell";
+                    if (n === "FREE") c.classList.add("free");
+                    c.innerText = n;
+                    grid.appendChild(c);
+                });
+                
+                cardDiv.appendChild(grid);
+                game.appendChild(cardDiv);
+            }
+        }
 
-}
+        // ==================== 9. ወደ ምርጫ ተመለስ ====================
+        function backToSelection() {
+            document.getElementById("selectPage").style.display = "block";
+            document.getElementById("gamePage").style.display = "none";
+        }
 
-function generateCard(){
-
-let nums=[]
-
-while(nums.length<25){
-
-let n=Math.floor(Math.random()*75)+1
-if(!nums.includes(n)) nums.push(n)
-
-}
-
-nums[12]="FREE"
-return nums
-
-}
-
-function createCard(card){
-
-let div=document.createElement("div")
-div.className="previewCard"
-
-let grid=document.createElement("div")
-grid.className="gridCard"
-
-card.forEach(n=>{
-
-let c=document.createElement("div")
-c.className="cell"
-c.innerText=n
-grid.appendChild(c)
-
-})
-
-div.appendChild(grid)
-
-return div
-
-}
-
-function updatePreview(){
-
-let preview=document.getElementById("preview")
-preview.innerHTML=""
-
-for(let c in selectedCards){
-
-let card=createCard(selectedCards[c])
-preview.appendChild(card)
-
-}
-
-}
-
-function confirmCards(){
-
-if(Object.keys(selectedCards).length==0){
-
-alert("Select at least one card")
-return
-
-}
-
-document.getElementById("selectPage").style.display="none"
-document.getElementById("gamePage").style.display="block"
-
-let game=document.getElementById("gameCards")
-
-for(let c in selectedCards){
-
-let title=document.createElement("h3")
-title.innerText="Card #"+c
-
-game.appendChild(title)
-
-game.appendChild(createCard(selectedCards[c]))
-
-}
-
-}
-
-</script>
-
+        // ==================== 10. ጀምር ====================
+        // ነባሪ ብር አሳይ
+        balanceSpan.innerText = playerBalance;
+        
+        // ማጠቃለያ አዘምን
+        updateSummary();
+    </script>
 </body>
 </html>
