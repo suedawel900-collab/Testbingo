@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MK BINGO</title>
+    <title>MK BINGO - 30s Countdown</title>
     <style>
         * {
             box-sizing: border-box;
@@ -19,7 +19,6 @@
             padding: 10px;
         }
 
-        /* Main Container - Smaller */
         .container {
             max-width: 600px;
             margin: 0 auto;
@@ -38,7 +37,7 @@
             text-shadow: 0 0 10px gold;
         }
 
-        /* Balance Box - Smaller */
+        /* Balance Box */
         .balance-box {
             background: rgba(0,0,0,0.5);
             padding: 10px;
@@ -55,7 +54,81 @@
             color: gold;
         }
 
-        /* Card Grid - Proper 5x5 */
+        /* Countdown Display */
+        .countdown-container {
+            text-align: center;
+            margin: 15px 0;
+            padding: 15px;
+            background: rgba(0,0,0,0.5);
+            border-radius: 15px;
+            border: 2px solid gold;
+        }
+
+        .countdown-timer {
+            font-size: 4em;
+            font-weight: bold;
+            color: gold;
+            text-shadow: 0 0 20px gold;
+            animation: pulse 1s infinite;
+        }
+
+        .countdown-text {
+            font-size: 1.2em;
+            color: white;
+            margin-top: 5px;
+        }
+
+        .countdown-small {
+            font-size: 0.9em;
+            color: rgba(255,255,255,0.8);
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        /* Game Header */
+        .game-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            background: rgba(0,0,0,0.3);
+            padding: 10px;
+            border-radius: 10px;
+        }
+
+        .timer {
+            font-size: 1.5em;
+            color: gold;
+        }
+
+        /* Called Numbers */
+        .called-numbers {
+            background: rgba(0,0,0,0.3);
+            padding: 10px;
+            border-radius: 10px;
+            margin: 10px 0;
+            max-height: 80px;
+            overflow-y: auto;
+        }
+
+        .number-ball {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: gold;
+            color: black;
+            text-align: center;
+            line-height: 30px;
+            margin: 2px;
+            font-size: 0.8em;
+        }
+
+        /* BINGO Card */
         .bingo-card {
             background: white;
             border-radius: 10px;
@@ -65,7 +138,6 @@
             box-shadow: 0 0 20px rgba(0,0,0,0.3);
         }
 
-        /* BINGO Header */
         .bingo-header {
             display: grid;
             grid-template-columns: repeat(5, 1fr);
@@ -83,7 +155,6 @@
             border-radius: 5px 5px 0 0;
         }
 
-        /* 5x5 Grid */
         .gridCard {
             display: grid;
             grid-template-columns: repeat(5, 1fr);
@@ -109,21 +180,19 @@
         .cell.free {
             background: gold;
             color: black;
-            font-weight: bold;
         }
 
         .cell.winning-cell {
             outline: 3px solid red;
-            animation: pulse 1s infinite;
+            animation: winPulse 1s infinite;
         }
 
-        @keyframes pulse {
+        @keyframes winPulse {
             0% { outline-color: red; }
             50% { outline-color: gold; }
             100% { outline-color: red; }
         }
 
-        /* Winner Card Animation */
         .winner-card {
             animation: winnerGlow 2s infinite;
             border: 3px solid gold !important;
@@ -135,7 +204,7 @@
             100% { box-shadow: 0 0 10px gold; }
         }
 
-        /* Card Selection Grid - Smaller */
+        /* Card Selection */
         #grid {
             display: grid;
             grid-template-columns: repeat(10, 1fr);
@@ -163,7 +232,7 @@
             color: white;
         }
 
-        /* Preview Cards - Smaller */
+        /* Preview Cards */
         #preview {
             display: flex;
             flex-wrap: wrap;
@@ -180,14 +249,7 @@
             max-width: 200px;
         }
 
-        .previewCard h4 {
-            font-size: 0.8em;
-            color: gold;
-            text-align: center;
-            margin-bottom: 5px;
-        }
-
-        /* Buttons - Smaller */
+        /* Buttons */
         button {
             padding: 8px 15px;
             font-size: 0.9em;
@@ -209,42 +271,12 @@
             background: #f44336;
         }
 
-        /* Game Page */
-        .called-numbers {
-            background: rgba(0,0,0,0.3);
-            padding: 10px;
-            border-radius: 10px;
-            margin: 10px 0;
-            max-height: 80px;
-            overflow-y: auto;
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
 
-        .number-ball {
-            display: inline-block;
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            background: gold;
-            color: black;
-            text-align: center;
-            line-height: 30px;
-            margin: 2px;
-            font-size: 0.8em;
-        }
-
-        .timer {
-            font-size: 1.5em;
-            color: gold;
-        }
-
-        .game-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-
-        /* Toggle Switch - Smaller */
+        /* Toggle Switch */
         .toggle-container {
             display: flex;
             align-items: center;
@@ -254,15 +286,44 @@
         }
 
         .toggle-switch {
+            position: relative;
+            display: inline-block;
             width: 60px;
             height: 30px;
         }
 
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: #f44336;
+            transition: .4s;
+            border-radius: 30px;
+        }
+
         .slider:before {
+            position: absolute;
+            content: "";
             height: 24px;
             width: 24px;
             left: 3px;
             bottom: 3px;
+            background: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background: #4CAF50;
         }
 
         input:checked + .slider:before {
@@ -284,6 +345,14 @@
             border-radius: 5px;
             font-size: 0.9em;
         }
+
+        /* Info Text */
+        .info-text {
+            text-align: center;
+            font-size: 0.8em;
+            color: rgba(255,255,255,0.7);
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body>
@@ -297,7 +366,7 @@
 
         <!-- Card Selection Page -->
         <div id="selectPage">
-            <h3 style="text-align: center; font-size: 1.2em;">🎫 Select Cards (1-1000)</h3>
+            <h3 style="text-align: center; font-size: 1.2em;">🎫 Select Cards (1-200)</h3>
             <div id="grid"></div>
 
             <div style="text-align: center; margin: 5px;">
@@ -312,6 +381,11 @@
 
             <h3 style="text-align: center; font-size: 1.2em; margin-top: 10px;">📋 Selected Cards</h3>
             <div id="preview"></div>
+            
+            <div class="info-text">
+                * 10 cards minimum for game to start<br>
+                * 30 second countdown after purchase
+            </div>
         </div>
 
         <!-- Game Page -->
@@ -321,11 +395,18 @@
                     <h2 style="font-size: 1.2em;">🎯 Game</h2>
                     <p style="font-size: 0.8em;">Prize: <span id="currentGamePrize">2000</span> ETB</p>
                 </div>
-                <div class="timer" id="timer">00:00</div>
+                <div class="timer" id="gameTimer">00:00</div>
             </div>
 
-            <!-- Auto-Mark Toggle -->
-            <div class="toggle-container">
+            <!-- Countdown Display (shown during 30s wait) -->
+            <div id="countdownSection" class="countdown-container">
+                <div class="countdown-timer" id="countdownNumber">30</div>
+                <div class="countdown-text">Game Starting in...</div>
+                <div class="countdown-small">Get ready!</div>
+            </div>
+
+            <!-- Auto-Mark Toggle (hidden during countdown) -->
+            <div id="toggleSection" class="toggle-container" style="display: none;">
                 <span style="font-size: 0.8em;">MANUAL</span>
                 <label class="toggle-switch">
                     <input type="checkbox" id="autoMarkToggle" checked>
@@ -334,12 +415,12 @@
                 <span style="font-size: 0.8em;">AUTO</span>
             </div>
 
-            <!-- Called Numbers -->
-            <div class="called-numbers">
+            <!-- Called Numbers (hidden until game starts) -->
+            <div id="calledSection" class="called-numbers" style="display: none;">
                 <div id="numbersList"></div>
             </div>
 
-            <!-- BINGO Button -->
+            <!-- BINGO Button (disabled during countdown) -->
             <div style="text-align: center;">
                 <button class="bingo-btn" onclick="callBingo()" id="bingoBtn" disabled>🔴 BINGO!</button>
             </div>
@@ -379,6 +460,8 @@
         let timerSeconds = 0;
         let gameTimer = null;
         let callInterval = null;
+        let countdownInterval = null;
+        let countdownValue = 30;
 
         // API endpoint
         const API_URL = window.location.origin;
@@ -410,7 +493,7 @@
         // ==================== CREATE NUMBER GRID ====================
         function createNumberGrid() {
             let grid = document.getElementById("grid");
-            for (let i = 1; i <= 200; i++) { // Show only 200 for mobile
+            for (let i = 1; i <= 200; i++) {
                 let box = document.createElement("div");
                 box.className = "box";
                 box.innerText = i;
@@ -438,42 +521,34 @@
             }
         }
 
-        // ==================== GENERATE CARD (Proper BINGO format) ====================
+        // ==================== GENERATE CARD ====================
         function generateCard(cardNumber) {
             let card = [];
             let seed = cardNumber || Math.floor(Math.random() * 1000);
-            
-            // Generate numbers for each column (BINGO format)
-            // B: 1-15, I: 16-30, N: 31-45, G: 46-60, O: 61-75
             
             for (let col = 0; col < 5; col++) {
                 let min = col * 15 + 1;
                 let max = (col + 1) * 15;
                 
-                // Generate 5 unique numbers for this column
                 let colNumbers = [];
                 while (colNumbers.length < 5) {
-                    // Use seed to make it deterministic but varied
                     let n = ((seed * (col + 1) + colNumbers.length * 7) % (max - min + 1)) + min;
                     if (!colNumbers.includes(n)) {
                         colNumbers.push(n);
                     }
                 }
                 
-                // Add to card in correct order (row by row)
                 for (let row = 0; row < 5; row++) {
                     let index = row * 5 + col;
                     card[index] = colNumbers[row];
                 }
             }
             
-            // Make the center cell FREE (position 12 in 0-based indexing, row 2, col 2)
             card[12] = "FREE";
-            
             return card;
         }
 
-        // ==================== CREATE CARD ELEMENT (With BINGO header) ====================
+        // ==================== CREATE CARD ELEMENT ====================
         function createCardElement(card, cardNumber, isWinner = false) {
             let div = document.createElement("div");
             div.className = "bingo-card";
@@ -486,7 +561,6 @@
             title.style.margin = '5px 0';
             div.appendChild(title);
 
-            // Add BINGO header
             let header = document.createElement("div");
             header.className = "bingo-header";
             ['B', 'I', 'N', 'G', 'O'].forEach(letter => {
@@ -497,7 +571,6 @@
             });
             div.appendChild(header);
 
-            // Create grid
             let grid = document.createElement("div");
             grid.className = "gridCard";
 
@@ -509,12 +582,10 @@
                     cell.classList.add("free");
                 }
                 
-                // Auto-mark called numbers
                 if (n !== "FREE" && gameSettings.calledNumbers.includes(n)) {
                     cell.classList.add("marked");
                 }
                 
-                // Manual mark click
                 cell.onclick = function(e) {
                     e.stopPropagation();
                     if (!autoMarkEnabled && n !== "FREE") {
@@ -522,7 +593,6 @@
                     }
                 };
                 
-                // Highlight winning cells
                 if (gameSettings.winners.some(w => w.cardNumber == cardNumber && w.cells.includes(index))) {
                     cell.classList.add("winning-cell");
                 }
@@ -542,7 +612,7 @@
             
             let count = 0;
             for (let cardNum in selectedCards) {
-                if (count++ >= 3) break; // Show only 3 previews
+                if (count++ >= 3) break;
                 
                 let div = document.createElement("div");
                 div.className = "previewCard";
@@ -551,7 +621,6 @@
                 title.innerText = `Card #${cardNum}`;
                 div.appendChild(title);
 
-                // Add mini BINGO header
                 let header = document.createElement("div");
                 header.style.display = 'grid';
                 header.style.gridTemplateColumns = 'repeat(5,1fr)';
@@ -619,6 +688,12 @@
                 return;
             }
             
+            // Check if at least 10 cards are selected
+            if (count < 10) {
+                alert(`❌ You need at least 10 cards to start a game!\nCurrent: ${count} cards`);
+                return;
+            }
+            
             if (playerBalance < total) {
                 alert(`Insufficient balance! Need ${total} ETB`);
                 return;
@@ -629,8 +704,50 @@
             
             currentGameCards = { ...selectedCards };
             
-            alert(`✅ ${count} cards purchased!`);
+            alert(`✅ ${count} cards purchased!\n⏱️ Game starts in 30 seconds...`);
             showGamePage();
+            startCountdown();
+        }
+
+        // ==================== START 30 SECOND COUNTDOWN ====================
+        function startCountdown() {
+            countdownValue = 30;
+            document.getElementById('countdownNumber').innerText = countdownValue;
+            
+            // Hide game elements during countdown
+            document.getElementById('toggleSection').style.display = 'none';
+            document.getElementById('calledSection').style.display = 'none';
+            document.getElementById('bingoBtn').disabled = true;
+            
+            countdownInterval = setInterval(() => {
+                countdownValue--;
+                document.getElementById('countdownNumber').innerText = countdownValue;
+                
+                // Make the countdown pulse faster as it gets lower
+                if (countdownValue <= 10) {
+                    document.getElementById('countdownNumber').style.animation = 'pulse 0.5s infinite';
+                }
+                
+                if (countdownValue <= 0) {
+                    clearInterval(countdownInterval);
+                    startGame();
+                }
+            }, 1000);
+        }
+
+        // ==================== START GAME (after countdown) ====================
+        function startGame() {
+            // Hide countdown, show game elements
+            document.getElementById('countdownSection').style.display = 'none';
+            document.getElementById('toggleSection').style.display = 'flex';
+            document.getElementById('calledSection').style.display = 'block';
+            
+            // Start the game
+            gameSettings.isGameActive = true;
+            startNumberCalls();
+            
+            // Enable Bingo button (will be enabled after first number)
+            bingoButtonEnabled = true;
         }
 
         // ==================== CANCEL SELECTION ====================
@@ -649,9 +766,14 @@
         function showGamePage() {
             document.getElementById("selectPage").style.display = "none";
             document.getElementById("gamePage").style.display = "block";
+            
+            // Show countdown section, hide others
+            document.getElementById('countdownSection').style.display = 'block';
+            document.getElementById('toggleSection').style.display = 'none';
+            document.getElementById('calledSection').style.display = 'none';
+            
             startTimer();
             updateGameCards();
-            startNumberCalls();
         }
 
         // ==================== UPDATE GAME CARDS ====================
@@ -668,10 +790,18 @@
 
         // ==================== BACK TO SELECTION ====================
         function backToSelection() {
+            // Stop all timers
+            if (countdownInterval) clearInterval(countdownInterval);
+            if (gameTimer) clearInterval(gameTimer);
+            if (callInterval) clearInterval(callInterval);
+            
             document.getElementById("selectPage").style.display = "block";
             document.getElementById("gamePage").style.display = "none";
-            clearInterval(gameTimer);
-            if (callInterval) clearInterval(callInterval);
+            
+            // Reset game state
+            gameSettings.isGameActive = false;
+            gameSettings.calledNumbers = [];
+            gameSettings.winners = [];
         }
 
         // ==================== CALL BINGO ====================
@@ -700,12 +830,14 @@
                 
                 showWinners();
                 gameSettings.isGameActive = false;
+                if (callInterval) clearInterval(callInterval);
                 updateGameCards();
             } else {
                 alert("❌ FALSE BINGO! You're out!");
                 delete currentGameCards;
                 document.getElementById("gameCards").innerHTML = "<h3 style='color: red; text-align: center;'>❌ DISQUALIFIED</h3>";
                 document.getElementById("bingoBtn").disabled = true;
+                if (callInterval) clearInterval(callInterval);
             }
         }
 
@@ -784,7 +916,6 @@
 
         // ==================== SIMULATE NUMBER CALLS ====================
         function startNumberCalls() {
-            gameSettings.isGameActive = true;
             gameSettings.calledNumbers = [];
             
             callInterval = setInterval(() => {
@@ -805,7 +936,6 @@
                     updateGameCards();
                     
                     // Enable Bingo button
-                    bingoButtonEnabled = true;
                     document.getElementById('bingoBtn').disabled = false;
                 }
             }, 3000);
@@ -819,7 +949,7 @@
                 timerSeconds++;
                 let mins = Math.floor(timerSeconds / 60);
                 let secs = timerSeconds % 60;
-                document.getElementById('timer').innerText = 
+                document.getElementById('gameTimer').innerText = 
                     `${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
             }, 1000);
         }
