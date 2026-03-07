@@ -9,12 +9,11 @@
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Courier New', monospace;
         }
 
         body {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
+            background: #f0f0f0;
             padding: 20px;
         }
 
@@ -22,775 +21,347 @@
             max-width: 1400px;
             margin: 0 auto;
             background: white;
-            border-radius: 20px;
-            padding: 30px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            border: 3px solid #333;
+            padding: 20px;
         }
 
         h1 {
             text-align: center;
-            color: #667eea;
             font-size: 2.5em;
             margin-bottom: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #333;
         }
 
-        h1 span {
-            background: #667eea;
-            color: white;
-            padding: 5px 15px;
-            border-radius: 50px;
-            font-size: 0.5em;
-        }
-
-        /* Number Grid */
-        .number-grid-section {
-            background: #f7fafc;
-            border-radius: 15px;
-            padding: 20px;
+        /* የቁጥር ግሪድ 1-100 */
+        .numbers-grid {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            gap: 2px;
+            background: #333;
+            padding: 2px;
             margin-bottom: 30px;
         }
 
-        .number-grid-section h2 {
-            color: #4a5568;
-            margin-bottom: 15px;
-            font-size: 1.3em;
-        }
-
-        .number-grid {
-            display: grid;
-            grid-template-columns: repeat(10, 1fr);
-            gap: 5px;
-            background: white;
-            padding: 15px;
-            border-radius: 10px;
-            border: 2px solid #e2e8f0;
-        }
-
         .number-cell {
-            aspect-ratio: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: #edf2f7;
-            border-radius: 5px;
-            font-weight: bold;
-            color: #2d3748;
+            background: white;
+            padding: 8px 4px;
+            text-align: center;
             font-size: 14px;
-            transition: all 0.2s;
-            cursor: pointer;
-        }
-
-        .number-cell:hover {
-            background: #cbd5e0;
-            transform: scale(1.1);
+            font-weight: bold;
+            border: 1px solid #999;
         }
 
         .number-cell.called {
-            background: #48bb78;
-            color: white;
-        }
-
-        /* Cards Grid */
-        .cards-section {
-            margin: 30px 0;
-        }
-
-        .cards-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-            gap: 15px;
-        }
-
-        .cards-header h2 {
-            color: #4a5568;
-            font-size: 1.5em;
-        }
-
-        .card-controls {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-        }
-
-        .card-controls select, .card-controls input {
-            padding: 8px 15px;
-            border: 2px solid #e2e8f0;
-            border-radius: 8px;
-            font-size: 14px;
-        }
-
-        .cards-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-            gap: 25px;
-            margin: 20px 0;
-        }
-
-        /* Bingo Card */
-        .bingo-card {
-            background: white;
-            border-radius: 15px;
-            padding: 15px;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
-            transition: all 0.3s;
-            border: 3px solid transparent;
-            cursor: pointer;
-        }
-
-        .bingo-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
-        }
-
-        .bingo-card.selected {
-            border-color: #48bb78;
-            background: #f0fff4;
-        }
-
-        .bingo-card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #e2e8f0;
-        }
-
-        .bingo-card-header .card-number {
+            background: #90EE90;
             font-weight: bold;
-            color: #667eea;
-            font-size: 1.1em;
         }
 
-        .bingo-card-header .card-price {
-            background: #48bb78;
+        /* የቢንጎ ካርድ */
+        .bingo-card {
+            border: 3px solid #333;
+            margin: 30px 0;
+            padding: 20px;
+            background: white;
+        }
+
+        .bingo-title {
+            text-align: center;
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            letter-spacing: 10px;
+        }
+
+        .bingo-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 2px;
+            background: #333;
+            padding: 2px;
+        }
+
+        .bingo-header {
+            background: #333;
             color: white;
-            padding: 3px 10px;
-            border-radius: 20px;
-            font-size: 0.9em;
-        }
-
-        .bingo-card-body {
-            border: 2px solid #e2e8f0;
-            border-radius: 10px;
-            overflow: hidden;
-            margin-bottom: 10px;
-        }
-
-        .bingo-row {
-            display: flex;
-        }
-
-        .bingo-row.header {
-            background: #667eea;
+            text-align: center;
+            padding: 15px;
+            font-weight: bold;
+            font-size: 24px;
         }
 
         .bingo-cell {
-            flex: 1;
-            padding: 12px 5px;
-            text-align: center;
-            border: 1px solid #e2e8f0;
-            font-weight: bold;
-            font-size: 16px;
-        }
-
-        .bingo-cell.header {
-            background: #5a67d8;
-            color: white;
-            border: none;
-            font-size: 18px;
-        }
-
-        .bingo-cell.free {
-            background: #fbbf24;
-            color: #000;
-        }
-
-        .bingo-card-footer {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-top: 10px;
-        }
-
-        .checkbox-wrapper {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            cursor: pointer;
-        }
-
-        .checkbox-wrapper input[type="checkbox"] {
-            width: 20px;
-            height: 20px;
-            cursor: pointer;
-        }
-
-        .card-status {
-            padding: 3px 10px;
-            border-radius: 20px;
-            font-size: 0.9em;
-            font-weight: bold;
-        }
-
-        .status-available {
-            background: #e2e8f0;
-            color: #4a5568;
-        }
-
-        .status-selected {
-            background: #48bb78;
-            color: white;
-        }
-
-        /* Pagination */
-        .pagination {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 15px;
-            margin: 30px 0;
-        }
-
-        .pagination button {
-            padding: 8px 20px;
-            border: none;
-            border-radius: 8px;
-            background: #667eea;
-            color: white;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .pagination button:hover:not(:disabled) {
-            background: #5a67d8;
-            transform: scale(1.05);
-        }
-
-        .pagination button:disabled {
-            background: #cbd5e0;
-            cursor: not-allowed;
-        }
-
-        .pagination span {
-            font-weight: bold;
-            color: #4a5568;
-        }
-
-        /* Selection Summary */
-        .selection-summary {
-            position: sticky;
-            bottom: 0;
             background: white;
+            text-align: center;
+            padding: 20px 10px;
+            font-size: 20px;
+            font-weight: bold;
+            border: 1px solid #999;
+        }
+
+        .free-cell {
+            background: #FFD700;
+            font-size: 28px;
+        }
+
+        /* የካርድ ቁጥሮች */
+        .card-numbers {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 20px 0;
             padding: 20px;
-            border-radius: 15px 15px 0 0;
-            box-shadow: 0 -5px 20px rgba(0,0,0,0.1);
-            margin-top: 30px;
-            border-top: 3px solid #667eea;
+            border: 2px solid #333;
+            background: #f9f9f9;
         }
 
-        .summary-content {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 20px;
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-
-        .summary-stats {
-            display: flex;
-            gap: 30px;
-            flex-wrap: wrap;
-        }
-
-        .stat-item {
+        .card-number-item {
+            padding: 8px 15px;
+            background: white;
+            border: 2px solid #333;
+            font-size: 16px;
+            font-weight: bold;
+            min-width: 50px;
             text-align: center;
         }
 
-        .stat-label {
-            color: #718096;
-            font-size: 0.9em;
+        /* የካርዶች ዝርዝር */
+        .cards-list {
+            margin: 30px 0;
+            padding: 20px;
+            border: 3px solid #333;
+            background: #f9f9f9;
         }
 
-        .stat-value {
-            font-size: 1.8em;
+        .cards-list h3 {
+            margin-bottom: 20px;
+            font-size: 24px;
             font-weight: bold;
-            color: #4a5568;
         }
 
-        .stat-value.total-price {
-            color: #48bb78;
+        .cards-list ul {
+            list-style: none;
         }
 
-        .summary-actions {
+        .cards-list li {
+            padding: 12px;
+            margin: 8px 0;
+            background: white;
+            border: 2px solid #333;
+            font-family: monospace;
+            font-size: 18px;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        /* Confirm/Cancel Buttons */
+        .action-buttons {
             display: flex;
-            gap: 15px;
+            gap: 20px;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 3px solid #333;
         }
 
         .btn {
-            padding: 12px 30px;
-            border: none;
-            border-radius: 10px;
-            font-size: 16px;
+            flex: 1;
+            padding: 20px;
+            font-size: 28px;
             font-weight: bold;
+            border: 3px solid #333;
+            background: white;
             cursor: pointer;
-            transition: all 0.3s;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 2px;
         }
 
         .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            background: #333;
+            color: white;
         }
 
         .btn-confirm {
-            background: #48bb78;
+            background: #4CAF50;
             color: white;
         }
 
         .btn-cancel {
-            background: #f56565;
+            background: #f44336;
             color: white;
         }
 
-        .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
+        .btn-confirm:hover {
+            background: #45a049;
         }
 
-        /* Loading */
-        .loading {
+        .btn-cancel:hover {
+            background: #da190b;
+        }
+
+        /* ማስታወሻ */
+        .note {
+            margin-top: 20px;
+            padding: 15px;
+            background: #e0e0e0;
+            border: 2px solid #333;
             text-align: center;
-            padding: 50px;
-            font-size: 1.2em;
-            color: #718096;
-        }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            .container {
-                padding: 15px;
-            }
-
-            h1 {
-                font-size: 2em;
-            }
-
-            .cards-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .summary-content {
-                flex-direction: column;
-            }
-
-            .summary-actions {
-                width: 100%;
-            }
-
-            .btn {
-                flex: 1;
-            }
-
-            .number-grid {
-                grid-template-columns: repeat(5, 1fr);
-            }
+            font-weight: bold;
+            font-size: 16px;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>
-            🎫 የቢንጎ ካርዶች ይምረጡ
-            <span>እስከ 1000 ካርዶች</span>
-        </h1>
+        <h1>የቢንጎ ካርድ ምርጫ</h1>
 
-        <!-- Number Grid Section (like in the image) -->
-        <div class="number-grid-section">
-            <h2>🔢 የተጠሩ ቁጥሮች ግሪድ</h2>
-            <div class="number-grid" id="numberGrid">
-                <!-- Numbers will be generated here -->
-            </div>
+        <!-- የቁጥር ግሪድ 1-100 (እንደ ምስሉ) -->
+        <div class="numbers-grid" id="numberGrid"></div>
+
+        <!-- የቢንጎ ካርድ (እንደ ምስሉ) -->
+        <div class="bingo-card">
+            <div class="bingo-title">B I N G O</div>
+            <div class="bingo-grid" id="bingoGrid"></div>
         </div>
 
-        <!-- Cards Section -->
-        <div class="cards-section">
-            <div class="cards-header">
-                <h2>📇 የቢንጎ ካርዶች (1-1000)</h2>
-                <div class="card-controls">
-                    <select id="cardsPerPage" onchange="changeCardsPerPage()">
-                        <option value="12">12 ካርዶች በገጽ</option>
-                        <option value="24">24 ካርዶች በገጽ</option>
-                        <option value="36">36 ካርዶች በገጽ</option>
-                        <option value="48">48 ካርዶች በገጽ</option>
-                    </select>
-                    <input type="text" id="searchCard" placeholder="🔍 የካርድ ቁጥር ይፈልጉ..." onkeyup="searchCards()">
-                </div>
-            </div>
+        <!-- የካርድ ቁጥሮች (እንደ ምስሉ) -->
+        <div class="card-numbers" id="cardNumbers"></div>
 
-            <div id="cardsGrid" class="cards-grid">
-                <!-- Cards will be generated here -->
-            </div>
-
-            <!-- Pagination -->
-            <div class="pagination" id="pagination">
-                <button onclick="prevPage()" id="prevBtn" disabled>← ቀዳሚ</button>
-                <span id="pageInfo">ገጽ 1 / 1</span>
-                <button onclick="nextPage()" id="nextBtn">ቀጣይ →</button>
-            </div>
+        <!-- የተመረጡ ካርዶች ዝርዝር (እንደ ምስሉ) -->
+        <div class="cards-list">
+            <h3>የተመረጡ ካርዶች ቁጥሮች:</h3>
+            <ul id="selectedCardsList">
+                <li>13   29   40   53   71</li>
+                <li>5    25   34   51   68</li>
+                <li>8    20    *   57   73</li>
+                <li>7    21   37   60   72</li>
+                <li>4    26   35   49   67</li>
+            </ul>
         </div>
 
-        <!-- Selection Summary (like Confirm/Cancel in image) -->
-        <div class="selection-summary">
-            <div class="summary-content">
-                <div class="summary-stats">
-                    <div class="stat-item">
-                        <div class="stat-label">የተመረጡ ካርዶች</div>
-                        <div class="stat-value" id="selectedCount">0</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-label">የአንድ ካርድ ዋጋ</div>
-                        <div class="stat-value" id="pricePerCard">10 ብር</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-label">ጠቅላላ ክፍያ</div>
-                        <div class="stat-value total-price" id="totalPrice">0 ብር</div>
-                    </div>
-                </div>
-                <div class="summary-actions">
-                    <button class="btn btn-confirm" id="confirmBtn" onclick="confirmSelection()">Confirm</button>
-                    <button class="btn btn-cancel" onclick="cancelSelection()">Cancel</button>
-                </div>
-            </div>
+        <!-- Confirm/Cancel Buttons (እንደ ምስሉ) -->
+        <div class="action-buttons">
+            <button class="btn btn-confirm" onclick="confirmSelection()">Confirm</button>
+            <button class="btn btn-cancel" onclick="cancelSelection()">Cancel</button>
+        </div>
+
+        <div class="note">
+            * አረንጓዴ ቀለም ያላቸው ቁጥሮች የተጠሩ ቁጥሮች ናቸው
         </div>
     </div>
 
     <script>
-        // State management
-        let allCards = [];
-        let selectedCards = new Set();
-        let currentPage = 1;
-        let cardsPerPage = 12;
-        let calledNumbers = [13, 29, 40, 53, 71, 5, 25, 34, 51, 68, 8, 20, 57, 73, 7, 21, 37, 60, 72, 4, 26, 35, 49, 67]; // Example called numbers from image
-        let pricePerCard = 10; // This would come from admin settings
-
-        // Initialize the page
-        document.addEventListener('DOMContentLoaded', () => {
-            generateNumberGrid();
-            generateAllCards(1000); // Generate up to 1000 cards
-            displayCards();
-            updateSelectionSummary();
-            
-            // Get price from localStorage or API
-            const savedPrice = localStorage.getItem('pricePerCard');
-            if (savedPrice) {
-                pricePerCard = parseInt(savedPrice);
-                document.getElementById('pricePerCard').textContent = pricePerCard + ' ብር';
-            }
-        });
-
-        // Generate number grid (1-100)
+        // የቁጥር ግሪድ 1-100 ማመንጨት
         function generateNumberGrid() {
             const grid = document.getElementById('numberGrid');
-            grid.innerHTML = '';
             
             for (let i = 1; i <= 100; i++) {
                 const cell = document.createElement('div');
-                cell.className = `number-cell ${calledNumbers.includes(i) ? 'called' : ''}`;
+                cell.className = 'number-cell';
                 cell.textContent = i;
-                cell.onclick = () => toggleNumber(i);
+                cell.id = `num-${i}`;
                 grid.appendChild(cell);
             }
         }
 
-        // Toggle number (for demo)
-        function toggleNumber(num) {
-            const index = calledNumbers.indexOf(num);
-            if (index === -1) {
-                calledNumbers.push(num);
-            } else {
-                calledNumbers.splice(index, 1);
-            }
-            generateNumberGrid();
-        }
-
-        // Generate all bingo cards (up to 1000)
-        function generateAllCards(count) {
-            allCards = [];
-            for (let i = 0; i < count; i++) {
-                allCards.push(generateBingoCard(i));
-            }
-        }
-
-        // Generate a single bingo card
-        function generateBingoCard(index) {
-            const card = {
-                id: index,
-                numbers: []
-            };
-
-            // Generate BINGO numbers (5x5 grid)
-            for (let row = 0; row < 5; row++) {
-                const rowNumbers = [];
-                for (let col = 0; col < 5; col++) {
-                    if (row === 2 && col === 2) {
-                        rowNumbers.push('*'); // FREE space (shown as * in the image)
-                    } else {
-                        const min = col * 15 + 1;
-                        const max = (col + 1) * 15;
-                        // Generate unique number for this column
-                        let num;
-                        do {
-                            num = Math.floor(Math.random() * (max - min + 1)) + min;
-                        } while (isNumberInColumn(card.numbers, col, num));
-                        rowNumbers.push(num);
-                    }
-                }
-                card.numbers.push(rowNumbers);
-            }
+        // የቢንጎ ካርድ ማመንጨት (እንደ ምስሉ)
+        function generateBingoCard() {
+            const grid = document.getElementById('bingoGrid');
             
-            return card;
-        }
-
-        // Check if number exists in column
-        function isNumberInColumn(cards, col, num) {
-            for (let row = 0; row < cards.length; row++) {
-                if (cards[row] && cards[row][col] === num) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        // Display cards for current page
-        function displayCards() {
-            const grid = document.getElementById('cardsGrid');
-            const start = (currentPage - 1) * cardsPerPage;
-            const end = start + cardsPerPage;
-            const pageCards = allCards.slice(start, end);
-            
-            grid.innerHTML = '';
-            pageCards.forEach(card => {
-                grid.appendChild(createCardElement(card));
+            // B I N G O headers
+            const headers = ['B', 'I', 'N', 'G', 'O'];
+            headers.forEach(letter => {
+                const header = document.createElement('div');
+                header.className = 'bingo-header';
+                header.textContent = letter;
+                grid.appendChild(header);
             });
 
-            updatePagination();
-        }
+            // ከምስሉ የተወሰዱ ቁጥሮች
+            const cardNumbers = [
+                [13, 29, 40, 53, 71],
+                [5, 25, 34, 51, 68],
+                [8, 20, '*', 57, 73],
+                [7, 21, 37, 60, 72],
+                [4, 26, 35, 49, 67]
+            ];
 
-        // Create card HTML element
-        function createCardElement(card) {
-            const cardDiv = document.createElement('div');
-            cardDiv.className = `bingo-card ${selectedCards.has(card.id) ? 'selected' : ''}`;
-            cardDiv.onclick = (e) => {
-                // Prevent toggling when clicking checkbox
-                if (e.target.type !== 'checkbox') {
-                    toggleCardSelection(card.id);
-                }
-            };
-
-            // Card header
-            let html = `
-                <div class="bingo-card-header">
-                    <span class="card-number">ካርድ #${card.id + 1}</span>
-                    <span class="card-price">${pricePerCard} ብር</span>
-                </div>
-                <div class="bingo-card-body">
-                    <div class="bingo-row header">
-                        <div class="bingo-cell header">B</div>
-                        <div class="bingo-cell header">I</div>
-                        <div class="bingo-cell header">N</div>
-                        <div class="bingo-cell header">G</div>
-                        <div class="bingo-cell header">O</div>
-                    </div>
-            `;
-
-            // Card numbers
-            card.numbers.forEach(row => {
-                html += '<div class="bingo-row">';
+            // ቁጥሮቹን ማስገባት
+            cardNumbers.forEach(row => {
                 row.forEach(num => {
-                    const isCalled = num === '*' || calledNumbers.includes(num);
-                    const cellClass = num === '*' ? 'bingo-cell free' : (isCalled ? 'bingo-cell called' : 'bingo-cell');
-                    html += `<div class="${cellClass}">${num}</div>`;
+                    const cell = document.createElement('div');
+                    cell.className = num === '*' ? 'bingo-cell free-cell' : 'bingo-cell';
+                    cell.textContent = num;
+                    grid.appendChild(cell);
                 });
-                html += '</div>';
             });
-
-            html += '</div>';
-
-            // Card footer with checkbox
-            html += `
-                <div class="bingo-card-footer">
-                    <label class="checkbox-wrapper">
-                        <input type="checkbox" 
-                               ${selectedCards.has(card.id) ? 'checked' : ''} 
-                               onchange="toggleCardSelection(${card.id})">
-                        <span>ካርድ ምረጥ</span>
-                    </label>
-                    <span class="card-status ${selectedCards.has(card.id) ? 'status-selected' : 'status-available'}">
-                        ${selectedCards.has(card.id) ? '✅ ተመርጧል' : '⬜ ለመምረጥ ይጫኑ'}
-                    </span>
-                </div>
-            `;
-
-            cardDiv.innerHTML = html;
-            return cardDiv;
         }
 
-        // Toggle card selection
-        window.toggleCardSelection = function(cardId) {
-            if (selectedCards.has(cardId)) {
-                selectedCards.delete(cardId);
-            } else {
-                selectedCards.add(cardId);
-            }
-            displayCards(); // Refresh display
-            updateSelectionSummary();
-        };
-
-        // Update selection summary
-        function updateSelectionSummary() {
-            const count = selectedCards.size;
-            const total = count * pricePerCard;
+        // የካርድ ቁጥሮች ማሳየት (እንደ ምስሉ)
+        function displayCardNumbers() {
+            const container = document.getElementById('cardNumbers');
+            const numbers = [13, 29, 40, 53, 71, 5, 25, 34, 51, 68, 8, 20, 57, 73, 7, 21, 37, 60, 72, 4, 26, 35, 49, 67];
             
-            document.getElementById('selectedCount').textContent = count;
-            document.getElementById('totalPrice').textContent = total + ' ብር';
-            document.getElementById('confirmBtn').disabled = count === 0;
+            numbers.sort((a, b) => a - b);
+            
+            numbers.forEach(num => {
+                const span = document.createElement('span');
+                span.className = 'card-number-item';
+                span.textContent = num;
+                container.appendChild(span);
+            });
         }
 
-        // Pagination functions
-        window.prevPage = function() {
-            if (currentPage > 1) {
-                currentPage--;
-                displayCards();
-            }
-        };
-
-        window.nextPage = function() {
-            const maxPage = Math.ceil(allCards.length / cardsPerPage);
-            if (currentPage < maxPage) {
-                currentPage++;
-                displayCards();
-            }
-        };
-
-        function updatePagination() {
-            const maxPage = Math.ceil(allCards.length / cardsPerPage);
-            document.getElementById('pageInfo').textContent = `ገጽ ${currentPage} / ${maxPage}`;
-            document.getElementById('prevBtn').disabled = currentPage === 1;
-            document.getElementById('nextBtn').disabled = currentPage === maxPage;
+        // የተጠሩ ቁጥሮችን ማጉላት
+        function highlightCalledNumbers() {
+            const calledNumbers = [13, 29, 40, 53, 71, 5, 25, 34, 51, 68, 8, 20, 57, 73, 7, 21, 37, 60, 72, 4, 26, 35, 49, 67];
+            
+            calledNumbers.forEach(num => {
+                const cell = document.getElementById(`num-${num}`);
+                if (cell) {
+                    cell.classList.add('called');
+                }
+            });
         }
 
-        // Change cards per page
-        window.changeCardsPerPage = function() {
-            cardsPerPage = parseInt(document.getElementById('cardsPerPage').value);
-            currentPage = 1;
-            displayCards();
-        };
-
-        // Search cards
-        window.searchCards = function() {
-            const searchTerm = document.getElementById('searchCard').value;
-            if (searchTerm) {
-                const cardNum = parseInt(searchTerm);
-                if (!isNaN(cardNum) && cardNum >= 1 && cardNum <= 1000) {
-                    // Go to page containing this card
-                    currentPage = Math.ceil(cardNum / cardsPerPage);
-                    displayCards();
-                    
-                    // Highlight the card
-                    setTimeout(() => {
-                        const cards = document.querySelectorAll('.bingo-card');
-                        cards.forEach(card => {
-                            if (card.querySelector(`.card-number`).textContent.includes(`#${cardNum}`)) {
-                                card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                card.style.animation = 'pulse 1s';
-                            }
-                        });
-                    }, 100);
-                }
-            }
-        };
-
-        // Confirm selection
-        window.confirmSelection = function() {
-            if (selectedCards.size === 0) {
-                alert('እባክዎ ቢያንስ አንድ ካርድ ይምረጡ');
-                return;
-            }
-
-            const totalPrice = selectedCards.size * pricePerCard;
-            const confirmation = confirm(`የተመረጡ ካርዶች: ${selectedCards.size}\nጠቅላላ ክፍያ: ${totalPrice} ብር\n\nመክፈል ይፈልጋሉ?`);
+        // Confirm function
+        function confirmSelection() {
+            const selectedCards = [
+                [13, 29, 40, 53, 71],
+                [5, 25, 34, 51, 68],
+                [8, 20, '*', 57, 73],
+                [7, 21, 37, 60, 72],
+                [4, 26, 35, 49, 67]
+            ];
             
-            if (confirmation) {
-                // Save selected cards to localStorage
-                const selectedCardsArray = Array.from(selectedCards).map(id => allCards[id]);
-                localStorage.setItem('selectedCards', JSON.stringify(selectedCardsArray));
-                localStorage.setItem('selectedCardIds', JSON.stringify(Array.from(selectedCards)));
-                localStorage.setItem('totalPayment', totalPrice);
-                
-                alert('ክፍያ ተሳክቷል! ወደ ጨዋታ ይግቡ።');
-                window.location.href = 'game.html'; // Redirect to game page
-            }
-        };
-
-        // Cancel selection
-        window.cancelSelection = function() {
-            if (selectedCards.size > 0) {
-                const confirm = window.confirm('እርግጠኛ ነዎት መሰረዝ ይፈልጋሉ? የተመረጡ ካርዶች ይጠፋሉ።');
-                if (confirm) {
-                    selectedCards.clear();
-                    displayCards();
-                    updateSelectionSummary();
-                }
-            } else {
-                window.location.href = 'dashboard.html'; // Go back to dashboard
-            }
-        };
-
-        // Add keyboard shortcuts
-        document.addEventListener('keydown', (e) => {
-            // Ctrl+A: Select all cards on current page
-            if (e.ctrlKey && e.key === 'a') {
-                e.preventDefault();
-                const start = (currentPage - 1) * cardsPerPage;
-                const end = start + cardsPerPage;
-                for (let i = start; i < end && i < allCards.length; i++) {
-                    selectedCards.add(i);
-                }
-                displayCards();
-                updateSelectionSummary();
-            }
+            localStorage.setItem('selectedCards', JSON.stringify(selectedCards));
             
-            // Ctrl+Enter: Confirm selection
-            if (e.ctrlKey && e.key === 'Enter') {
-                confirmSelection();
-            }
+            // የክፍያ መረጃ ማስቀመጥ
+            const totalCards = selectedCards.length;
+            const pricePerCard = 10; // ከadmin የሚመጣ
+            const totalPrice = totalCards * pricePerCard;
             
-            // Escape: Cancel
-            if (e.key === 'Escape') {
-                cancelSelection();
-            }
-        });
+            localStorage.setItem('selectedCardCount', totalCards);
+            localStorage.setItem('totalPrice', totalPrice);
+            
+            alert(`5 ካርዶች ተመርጠዋል!\nጠቅላላ ክፍያ: ${totalPrice} ብር`);
+            
+            // ወደ ክፍያ ገጽ መሄድ
+            // window.location.href = 'payment.html';
+        }
 
-        // Add pulse animation
-        const style = document.createElement('style');
-        style.textContent = `
-            @keyframes pulse {
-                0% { transform: scale(1); }
-                50% { transform: scale(1.05); box-shadow: 0 0 30px #667eea; }
-                100% { transform: scale(1); }
+        // Cancel function
+        function cancelSelection() {
+            if (confirm('እርግጠኛ ነዎት መሰረዝ ይፈልጋሉ?')) {
+                window.location.href = 'dashboard.html';
             }
-        `;
-        document.head.appendChild(style);
+        }
+
+        // ሁሉንም አስጀምር
+        generateNumberGrid();
+        generateBingoCard();
+        displayCardNumbers();
+        highlightCalledNumbers();
     </script>
 </body>
 </html>
