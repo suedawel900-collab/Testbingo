@@ -3,17 +3,21 @@ import sqlite3
 import multiprocessing
 import logging
 import time
-import sys
+import json
 from datetime import datetime
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, session
 
 # Setup logging
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
 logger = logging.getLogger(__name__)
 
 # ==================== FLASK APP ====================
 application = Flask(__name__)
 app = application
+app.secret_key = os.environ.get('SECRET_KEY', 'bingo-secret-key-2026')
 
 # Configuration
 BOT_TOKEN = os.environ.get('BOT_TOKEN')
@@ -27,6 +31,7 @@ IS_MAIN_PROCESS = os.environ.get('RUN_MAIN') == 'true' or not os.environ.get('GU
 logger.info(f"Starting with BOT_TOKEN: {BOT_TOKEN[:5] if BOT_TOKEN else 'None'}...")
 logger.info(f"APP_URL: {APP_URL}")
 logger.info(f"IS_MAIN_PROCESS: {IS_MAIN_PROCESS}")
+logger.info(f"ADMIN_ID: {ADMIN_ID}")
 
 # ==================== DATABASE SETUP ====================
 def init_db():
@@ -47,7 +52,12 @@ def init_db():
                   wins INTEGER DEFAULT 0,
                   total_deposits INTEGER DEFAULT 0,
                   phone_number TEXT,
+                  is_admin BOOLEAN DEFAULT 0,
                   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+    
+    # Make the admin user an admin
+    if ADMIN_ID:
+        c.execute("UPDATE users SET is_admin = 1 WHERE telegram_id = ?", (ADMIN_ID,))
     
     # Transactions table
     c.execute('''CREATE TABLE IF NOT EXISTS transactions
@@ -61,6 +71,63 @@ def init_db():
                   approved_at TIMESTAMP,
                   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                   FOREIGN KEY (user_id) REFERENCES users(id))''')
+    
+    # Game settings table
+    c.execute('''CREATE TABLE IF NOT EXISTS game_settings
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  game_type TEXT DEFAULT 'full house',
+                  card_price INTEGER DEFAULT 10,
+                  prize_pool INTEGER DEFAULT 2000,
+                  min_cards_to_start INTEGER DEFAULT 10,
+                  call_interval INTEGER DEFAULT 3,
+                  updated_by INTEGER,
+                  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+    
+    # Insert default settings if not exists
+    c.execute("SELECT COUNT(*) FROM game_settings")
+    if c.fetchone()[0] == 0:
+        c.execute('''INSERT INTO game_settings 
+                     (game_type, card_price, prize_pool, min_cards_to_start, call_interval) 
+                     VALUES (?, ?, ?, ?, ?)''',
+                  ('full house', 10, 2000, 10, 3))
+    
+    # Game sessions table
+    c.execute('''CREATE TABLE IF NOT EXISTS game_sessions
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  session_id TEXT UNIQUE,
+                  game_type TEXT,
+                  card_price INTEGER,
+                  prize_pool INTEGER,
+                  total_cards_sold INTEGER DEFAULT 0,
+                  total_players INTEGER DEFAULT 0,
+                  status TEXT DEFAULT 'waiting',
+                  started_at TIMESTAMP,
+                  ended_at TIMESTAMP,
+                  winner_id INTEGER,
+                  winning_card TEXT)''')
+    
+    # Game participants table
+    c.execute('''CREATE TABLE IF NOT EXISTS game_participants
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  session_id TEXT,
+                  user_id INTEGER,
+                  cards TEXT,
+                  cards_bought INTEGER,
+                  paid_amount INTEGER,
+                  has_bingo BOOLEAN DEFAULT 0,
+                  joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                  FOREIGN KEY (user_id) REFERENCES users(id),
+                  FOREIGN KEY (session_id) REFERENCES game_sessions(session_id))''')
+    
+    # Admin logs table
+    c.execute('''CREATE TABLE IF NOT EXISTS admin_logs
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  admin_id INTEGER,
+                  action TEXT,
+                  details TEXT,
+                  ip_address TEXT,
+                  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                  FOREIGN KEY (admin_id) REFERENCES users(id))''')
     
     conn.commit()
     conn.close()
@@ -88,7 +155,8 @@ def get_user(telegram_id):
             'wins': user[6],
             'total_deposits': user[7],
             'phone_number': user[8],
-            'created_at': user[9]
+            'is_admin': user[9],
+            'created_at': user[10]
         }
     return None
 
@@ -143,6 +211,157 @@ def approve_transaction(tx_id, admin_id):
     conn.close()
     return telegram_id, amount
 
+def get_game_settings():
+    """Get current game settings"""
+    conn = sqlite3.connect('database/bingo.db')
+    c = conn.cursor()
+    c.execute("SELECT game_type, card_price, prize_pool, min_cards_to_start, call_interval FROM game_settings ORDER BY updated_at DESC LIMIT 1")
+    settings = c.fetchone()
+    conn.close()
+    
+    if settings:
+        return {
+            'game_type': settings[0],
+            'card_price': settings[1],
+            'prize_pool': settings[2],
+            'min_cards_to_start': settings[3],
+            'call_interval': settings[4]
+        }
+    return {'game_type': 'full house', 'card_price': 10, 'prize_pool': 2000, 'min_cards_to_start': 10, 'call_interval': 3}
+
+def update_game_settings(admin_id, settings):
+    """Update game settings"""
+    conn = sqlite3.connect('database/bingo.db')
+    c = conn.cursor()
+    c.execute('''INSERT INTO game_settings 
+                 (game_type, card_price, prize_pool, min_cards_to_start, call_interval, updated_by) 
+                 VALUES (?, ?, ?, ?, ?, ?)''',
+              (settings['game_type'], settings['card_price'], settings['prize_pool'], 
+               settings['min_cards_to_start'], settings['call_interval'], admin_id))
+    conn.commit()
+    conn.close()
+    
+    # Log admin action
+    log_admin_action(admin_id, 'update_settings', json.dumps(settings))
+
+def get_pending_transactions():
+    """Get all pending transactions"""
+    conn = sqlite3.connect('database/bingo.db')
+    c = conn.cursor()
+    c.execute('''SELECT t.id, u.username, u.first_name, u.telegram_id, t.amount, t.tx_id, t.created_at 
+                 FROM transactions t
+                 JOIN users u ON t.user_id = u.id
+                 WHERE t.status = 'pending'
+                 ORDER BY t.created_at DESC''')
+    transactions = c.fetchall()
+    conn.close()
+    
+    result = []
+    for t in transactions:
+        result.append({
+            'id': t[0],
+            'username': t[1],
+            'name': t[2],
+            'telegram_id': t[3],
+            'amount': t[4],
+            'tx_id': t[5],
+            'created_at': t[6]
+        })
+    return result
+
+def get_all_users():
+    """Get all users"""
+    conn = sqlite3.connect('database/bingo.db')
+    c = conn.cursor()
+    c.execute('''SELECT id, telegram_id, username, first_name, balance, games_played, wins, total_deposits, phone_number, is_admin 
+                 FROM users ORDER BY balance DESC''')
+    users = c.fetchall()
+    conn.close()
+    
+    result = []
+    for u in users:
+        result.append({
+            'id': u[0],
+            'telegram_id': u[1],
+            'username': u[2],
+            'name': u[3],
+            'balance': u[4],
+            'games_played': u[5],
+            'wins': u[6],
+            'total_deposits': u[7],
+            'phone': u[8],
+            'is_admin': u[9]
+        })
+    return result
+
+def get_game_stats():
+    """Get game statistics"""
+    conn = sqlite3.connect('database/bingo.db')
+    c = conn.cursor()
+    
+    # Total users
+    c.execute("SELECT COUNT(*) FROM users")
+    total_users = c.fetchone()[0]
+    
+    # Total transactions
+    c.execute("SELECT COUNT(*), SUM(amount) FROM transactions WHERE status = 'approved'")
+    tx_count, tx_total = c.fetchone()
+    
+    # Total games played
+    c.execute("SELECT SUM(games_played) FROM users")
+    total_games = c.fetchone()[0] or 0
+    
+    # Active game session
+    c.execute("SELECT COUNT(*) FROM game_sessions WHERE status = 'active'")
+    active_games = c.fetchone()[0]
+    
+    conn.close()
+    
+    return {
+        'total_users': total_users,
+        'total_transactions': tx_count or 0,
+        'total_deposits': tx_total or 0,
+        'total_games': total_games,
+        'active_games': active_games
+    }
+
+def log_admin_action(admin_id, action, details):
+    """Log admin action"""
+    conn = sqlite3.connect('database/bingo.db')
+    c = conn.cursor()
+    c.execute("INSERT INTO admin_logs (admin_id, action, details, ip_address) VALUES (?, ?, ?, ?)",
+              (admin_id, action, details, request.remote_addr))
+    conn.commit()
+    conn.close()
+
+def create_game_session(settings):
+    """Create a new game session"""
+    import uuid
+    session_id = str(uuid.uuid4())[:8]
+    
+    conn = sqlite3.connect('database/bingo.db')
+    c = conn.cursor()
+    c.execute('''INSERT INTO game_sessions 
+                 (session_id, game_type, card_price, prize_pool, status, started_at) 
+                 VALUES (?, ?, ?, ?, 'active', ?)''',
+              (session_id, settings['game_type'], settings['card_price'], 
+               settings['prize_pool'], datetime.now()))
+    conn.commit()
+    conn.close()
+    
+    return session_id
+
+def end_game_session(session_id, winner_id, winning_card):
+    """End a game session"""
+    conn = sqlite3.connect('database/bingo.db')
+    c = conn.cursor()
+    c.execute('''UPDATE game_sessions 
+                 SET status = 'ended', ended_at = ?, winner_id = ?, winning_card = ? 
+                 WHERE session_id = ?''',
+              (datetime.now(), winner_id, winning_card, session_id))
+    conn.commit()
+    conn.close()
+
 # ==================== BOT PROCESS ====================
 def run_bot_process():
     """Run bot in a separate process"""
@@ -187,6 +406,14 @@ def run_bot_process():
         conn.commit()
         conn.close()
     
+    def bot_get_game_settings():
+        conn = sqlite3.connect('database/bingo.db')
+        c = conn.cursor()
+        c.execute("SELECT game_type, card_price, prize_pool, min_cards_to_start FROM game_settings ORDER BY updated_at DESC LIMIT 1")
+        settings = c.fetchone()
+        conn.close()
+        return settings
+    
     # ==================== BOT HANDLERS ====================
     async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user = update.effective_user
@@ -197,6 +424,9 @@ def run_bot_process():
         if not db_user:
             bot_create_user(user.id, user.username, user.first_name)
             db_user = bot_get_user(user.id)
+        
+        # Check if admin
+        is_admin = db_user[9] == 1
         
         # Check if phone number exists
         if not db_user[8]:  # phone_number column
@@ -212,7 +442,7 @@ def run_bot_process():
             )
             return
         
-        # Main menu
+        # Main menu buttons
         keyboard = [
             [InlineKeyboardButton("🎮 PLAY BINGO", web_app={"url": f"{APP_URL}/game?user={user.id}"})],
             [
@@ -221,6 +451,10 @@ def run_bot_process():
             ],
             [InlineKeyboardButton("💳 BALANCE", callback_data="balance")]
         ]
+        
+        # Add admin button if user is admin
+        if is_admin:
+            keyboard.append([InlineKeyboardButton("👑 ADMIN PANEL", web_app={"url": f"{APP_URL}/admin?user={user.id}"})])
         
         await update.message.reply_text(
             f"🎰 Welcome to MK BINGO, {user.first_name}!\n"
@@ -238,6 +472,8 @@ def run_bot_process():
             
             # Show main menu
             db_user = bot_get_user(user.id)
+            is_admin = db_user[9] == 1
+            
             keyboard = [
                 [InlineKeyboardButton("🎮 PLAY BINGO", web_app={"url": f"{APP_URL}/game?user={user.id}"})],
                 [
@@ -246,6 +482,9 @@ def run_bot_process():
                 ],
                 [InlineKeyboardButton("💳 BALANCE", callback_data="balance")]
             ]
+            
+            if is_admin:
+                keyboard.append([InlineKeyboardButton("👑 ADMIN PANEL", web_app={"url": f"{APP_URL}/admin?user={user.id}"})])
             
             await update.message.reply_text(
                 f"🎰 You can now play!",
@@ -323,6 +562,21 @@ def run_bot_process():
                 f"Amount: {amount} ETB",
                 parse_mode='Markdown'
             )
+        
+        elif data.startswith("reject_"):
+            if user.id != ADMIN_ID:
+                await query.edit_message_text("❌ Unauthorized")
+                return
+            
+            tx_id = data.replace("reject_", "")
+            
+            conn = sqlite3.connect('database/bingo.db')
+            c = conn.cursor()
+            c.execute("UPDATE transactions SET status='rejected' WHERE tx_id=?", (tx_id,))
+            conn.commit()
+            conn.close()
+            
+            await query.edit_message_text(f"❌ Deposit Rejected")
     
     async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user = update.effective_user
@@ -394,7 +648,7 @@ def run_bot_process():
             
             context.user_data.clear()
     
-    # Create and run application with proper error handling
+    # Create and run application
     try:
         bot_app = Application.builder().token(BOT_TOKEN).build()
         bot_app.add_handler(CommandHandler("start", start))
@@ -403,42 +657,38 @@ def run_bot_process():
         bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
         
         logger.info("Bot process starting polling...")
-        
-        # Run with error handling for conflicts
         bot_app.run_polling(drop_pending_updates=True)
         
     except Conflict as e:
         logger.error(f"Conflict error - another bot instance is running: {e}")
-        sys.exit(1)
     except Exception as e:
         logger.error(f"Bot process error: {e}")
         time.sleep(5)
 
-# ==================== START BOT PROCESS (ONLY ONCE) ====================
+# ==================== START BOT PROCESS ====================
 bot_process = None
 
 def start_bot_process():
     """Start the bot in a separate process - ONLY ONCE"""
     global bot_process
     
-    # Only start bot in the main process, not in Gunicorn workers
     if not IS_MAIN_PROCESS:
         logger.info("Skipping bot start in Gunicorn worker")
         return
     
-    # Check if already running
     if bot_process and bot_process.is_alive():
         logger.info("Bot process already running")
         return
     
-    # Kill any existing bot processes
+    # Try to kill any existing bot processes
     try:
         import psutil
         current_pid = os.getpid()
         for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
             try:
-                if 'python' in proc.info['name'] and 'bot' in str(proc.info['cmdline']).lower():
-                    if proc.info['pid'] != current_pid:
+                if proc.info['pid'] != current_pid and 'python' in proc.info['name']:
+                    cmdline = ' '.join(proc.info['cmdline']) if proc.info['cmdline'] else ''
+                    if 'bot' in cmdline.lower() or 'run_bot_process' in cmdline:
                         logger.info(f"Killing old bot process: {proc.info['pid']}")
                         proc.kill()
             except:
@@ -446,18 +696,16 @@ def start_bot_process():
     except:
         pass
     
-    # Start new bot process
     bot_process = multiprocessing.Process(target=run_bot_process, daemon=True)
     bot_process.start()
     logger.info(f"Bot process started with PID: {bot_process.pid}")
 
-# Start bot ONLY in main process
 if BOT_TOKEN and IS_MAIN_PROCESS:
     start_bot_process()
-else:
-    logger.info("Bot not started - not main process or no token")
 
 # ==================== FLASK ROUTES ====================
+
+# Player routes
 @application.route('/')
 def index():
     return render_template('index.html')
@@ -480,12 +728,16 @@ def get_user_data(telegram_id):
     if user:
         return jsonify({
             'success': True,
-            'balance': user['balance']
+            'balance': user['balance'],
+            'games': user['games_played'],
+            'wins': user['wins'],
+            'is_admin': user['is_admin']
         })
     return jsonify({'success': False, 'error': 'Not found'}), 404
 
 @application.route('/api/game/session')
 def get_game_session():
+    """Get current game session info"""
     return jsonify({
         'success': True,
         'total_cards_sold': 0,
@@ -496,19 +748,290 @@ def get_game_session():
 
 @application.route('/api/game/purchase', methods=['POST'])
 def purchase_cards():
+    """Handle card purchase"""
     data = request.json
+    telegram_id = data.get('user_id')
+    cards_bought = data.get('cards_bought', 0)
+    total_paid = data.get('total_paid', 0)
+    
+    user = get_user(telegram_id)
+    if not user:
+        return jsonify({'success': False, 'error': 'User not found'}), 404
+    
+    # Update balance
+    conn = sqlite3.connect('database/bingo.db')
+    c = conn.cursor()
+    c.execute("UPDATE users SET balance = balance - ? WHERE telegram_id = ?", 
+              (total_paid, telegram_id))
+    c.execute("SELECT balance FROM users WHERE telegram_id = ?", (telegram_id,))
+    new_balance = c.fetchone()[0]
+    conn.commit()
+    conn.close()
+    
     return jsonify({
         'success': True,
-        'new_balance': 1000,
-        'game_ready': False
+        'new_balance': new_balance,
+        'game_ready': True
     })
 
+# ==================== ADMIN ROUTES ====================
+
+@application.route('/admin')
+def admin_panel():
+    """Admin panel page"""
+    user_id = request.args.get('user')
+    if not user_id:
+        return "Unauthorized", 401
+    
+    user = get_user(int(user_id))
+    if not user or not user['is_admin']:
+        return "Unauthorized", 401
+    
+    return render_template('admin.html', admin_id=user_id, admin_name=user['first_name'])
+
+@application.route('/api/admin/check/<int:telegram_id>')
+def check_admin(telegram_id):
+    """Check if user is admin"""
+    user = get_user(telegram_id)
+    if user and user['is_admin']:
+        return jsonify({'success': True, 'is_admin': True})
+    return jsonify({'success': False, 'is_admin': False}), 403
+
+@application.route('/api/admin/stats')
+def admin_stats():
+    """Get admin statistics"""
+    admin_id = request.args.get('admin_id')
+    if not admin_id:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    
+    user = get_user(int(admin_id))
+    if not user or not user['is_admin']:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+    
+    stats = get_game_stats()
+    settings = get_game_settings()
+    
+    return jsonify({
+        'success': True,
+        'stats': stats,
+        'settings': settings
+    })
+
+@application.route('/api/admin/users')
+def admin_users():
+    """Get all users"""
+    admin_id = request.args.get('admin_id')
+    if not admin_id:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    
+    user = get_user(int(admin_id))
+    if not user or not user['is_admin']:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+    
+    users = get_all_users()
+    return jsonify({'success': True, 'users': users})
+
+@application.route('/api/admin/transactions')
+def admin_transactions():
+    """Get pending transactions"""
+    admin_id = request.args.get('admin_id')
+    if not admin_id:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    
+    user = get_user(int(admin_id))
+    if not user or not user['is_admin']:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+    
+    transactions = get_pending_transactions()
+    return jsonify({'success': True, 'transactions': transactions})
+
+@application.route('/api/admin/update-settings', methods=['POST'])
+def update_settings():
+    """Update game settings"""
+    data = request.json
+    admin_id = data.get('admin_id')
+    
+    if not admin_id:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    
+    user = get_user(int(admin_id))
+    if not user or not user['is_admin']:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+    
+    settings = {
+        'game_type': data.get('game_type', 'full house'),
+        'card_price': int(data.get('card_price', 10)),
+        'prize_pool': int(data.get('prize_pool', 2000)),
+        'min_cards_to_start': int(data.get('min_cards_to_start', 10)),
+        'call_interval': int(data.get('call_interval', 3))
+    }
+    
+    update_game_settings(user['id'], settings)
+    
+    return jsonify({'success': True})
+
+@application.route('/api/admin/approve-transaction', methods=['POST'])
+def admin_approve_transaction():
+    """Approve a transaction"""
+    data = request.json
+    admin_id = data.get('admin_id')
+    tx_id = data.get('tx_id')
+    
+    if not admin_id or not tx_id:
+        return jsonify({'success': False, 'error': 'Missing data'}), 400
+    
+    user = get_user(int(admin_id))
+    if not user or not user['is_admin']:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+    
+    telegram_id, amount = approve_transaction(tx_id, user['id'])
+    
+    return jsonify({
+        'success': True,
+        'message': f'Approved {amount} ETB for user {telegram_id}'
+    })
+
+@application.route('/api/admin/reject-transaction', methods=['POST'])
+def admin_reject_transaction():
+    """Reject a transaction"""
+    data = request.json
+    admin_id = data.get('admin_id')
+    tx_id = data.get('tx_id')
+    
+    if not admin_id or not tx_id:
+        return jsonify({'success': False, 'error': 'Missing data'}), 400
+    
+    user = get_user(int(admin_id))
+    if not user or not user['is_admin']:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+    
+    conn = sqlite3.connect('database/bingo.db')
+    c = conn.cursor()
+    c.execute("UPDATE transactions SET status='rejected' WHERE tx_id=?", (tx_id,))
+    conn.commit()
+    conn.close()
+    
+    log_admin_action(user['id'], 'reject_transaction', tx_id)
+    
+    return jsonify({'success': True})
+
+@application.route('/api/admin/update-balance', methods=['POST'])
+def admin_update_balance():
+    """Manually update user balance"""
+    data = request.json
+    admin_id = data.get('admin_id')
+    target_id = data.get('target_id')
+    amount = int(data.get('amount', 0))
+    operation = data.get('operation', 'add')
+    
+    if not admin_id or not target_id:
+        return jsonify({'success': False, 'error': 'Missing data'}), 400
+    
+    user = get_user(int(admin_id))
+    if not user or not user['is_admin']:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+    
+    conn = sqlite3.connect('database/bingo.db')
+    c = conn.cursor()
+    
+    if operation == 'add':
+        c.execute("UPDATE users SET balance = balance + ? WHERE telegram_id = ?", 
+                  (amount, target_id))
+    else:
+        c.execute("UPDATE users SET balance = balance - ? WHERE telegram_id = ?", 
+                  (amount, target_id))
+    
+    c.execute("SELECT balance FROM users WHERE telegram_id = ?", (target_id,))
+    new_balance = c.fetchone()[0]
+    conn.commit()
+    conn.close()
+    
+    log_admin_action(user['id'], f'update_balance_{operation}', f'{target_id}: {amount}')
+    
+    return jsonify({'success': True, 'new_balance': new_balance})
+
+@application.route('/api/admin/start-game', methods=['POST'])
+def admin_start_game():
+    """Start a new game session"""
+    data = request.json
+    admin_id = data.get('admin_id')
+    
+    if not admin_id:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    
+    user = get_user(int(admin_id))
+    if not user or not user['is_admin']:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+    
+    settings = get_game_settings()
+    session_id = create_game_session(settings)
+    
+    log_admin_action(user['id'], 'start_game', session_id)
+    
+    return jsonify({'success': True, 'session_id': session_id})
+
+@application.route('/api/admin/end-game', methods=['POST'])
+def admin_end_game():
+    """End current game session"""
+    data = request.json
+    admin_id = data.get('admin_id')
+    session_id = data.get('session_id')
+    winner_id = data.get('winner_id')
+    winning_card = data.get('winning_card')
+    
+    if not admin_id or not session_id:
+        return jsonify({'success': False, 'error': 'Missing data'}), 400
+    
+    user = get_user(int(admin_id))
+    if not user or not user['is_admin']:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+    
+    end_game_session(session_id, winner_id, winning_card)
+    
+    log_admin_action(user['id'], 'end_game', session_id)
+    
+    return jsonify({'success': True})
+
+@application.route('/api/admin/logs')
+def admin_logs():
+    """Get admin action logs"""
+    admin_id = request.args.get('admin_id')
+    
+    if not admin_id:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    
+    user = get_user(int(admin_id))
+    if not user or not user['is_admin']:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+    
+    conn = sqlite3.connect('database/bingo.db')
+    c = conn.cursor()
+    c.execute('''SELECT l.created_at, u.username, l.action, l.details 
+                 FROM admin_logs l
+                 JOIN users u ON l.admin_id = u.id
+                 ORDER BY l.created_at DESC LIMIT 50''')
+    logs = c.fetchall()
+    conn.close()
+    
+    result = []
+    for l in logs:
+        result.append({
+            'time': l[0],
+            'admin': l[1],
+            'action': l[2],
+            'details': l[3]
+        })
+    
+    return jsonify({'success': True, 'logs': result})
+
+# Health check
 @application.route('/health')
 def health():
     return jsonify({
         'status': 'ok',
         'bot_process': bot_process.is_alive() if bot_process else False,
         'is_main_process': IS_MAIN_PROCESS,
+        'admin_id': ADMIN_ID,
         'url': APP_URL
     })
 
