@@ -2,21 +2,21 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MK BINGO - Admin Panel</title>
     <style>
         * {
-            box-sizing: border-box;
             margin: 0;
             padding: 0;
+            box-sizing: border-box;
         }
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            background: linear-gradient(135deg, #1e3c72, #2a5298);
             min-height: 100vh;
             color: white;
-            padding: 15px;
+            padding: 20px;
         }
 
         .container {
@@ -26,7 +26,7 @@
 
         /* Header */
         .header {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(255,255,255,0.1);
             padding: 20px;
             border-radius: 15px;
             margin-bottom: 20px;
@@ -35,13 +35,11 @@
             align-items: center;
             border: 2px solid gold;
             flex-wrap: wrap;
-            gap: 10px;
         }
 
         .header h1 {
             color: gold;
             font-size: 2em;
-            text-shadow: 0 0 10px gold;
         }
 
         .admin-info {
@@ -54,13 +52,13 @@
         /* Stats Cards */
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 15px;
             margin-bottom: 20px;
         }
 
         .stat-card {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(255,255,255,0.1);
             padding: 20px;
             border-radius: 15px;
             border: 1px solid gold;
@@ -75,8 +73,7 @@
 
         .stat-label {
             font-size: 0.9em;
-            color: rgba(255,255,255,0.8);
-            margin-top: 5px;
+            opacity: 0.9;
         }
 
         /* Tabs */
@@ -93,13 +90,7 @@
             border: 2px solid gold;
             border-radius: 30px;
             cursor: pointer;
-            color: white;
             font-weight: bold;
-            transition: all 0.2s;
-        }
-
-        .tab:hover {
-            background: rgba(255,215,0,0.3);
         }
 
         .tab.active {
@@ -107,7 +98,6 @@
             color: black;
         }
 
-        /* Tab Content */
         .tab-content {
             display: none;
         }
@@ -116,9 +106,9 @@
             display: block;
         }
 
-        /* Admin Cards */
+        /* Cards */
         .admin-card {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(255,255,255,0.1);
             border-radius: 15px;
             padding: 20px;
             border: 2px solid gold;
@@ -136,53 +126,6 @@
 
         .card-header h2 {
             color: gold;
-            font-size: 1.3em;
-        }
-
-        .badge {
-            background: gold;
-            color: black;
-            padding: 5px 10px;
-            border-radius: 20px;
-            font-size: 0.8em;
-            font-weight: bold;
-        }
-
-        /* Settings Form */
-        .settings-form {
-            display: grid;
-            gap: 15px;
-        }
-
-        .form-group {
-            display: grid;
-            gap: 5px;
-        }
-
-        .form-group label {
-            font-size: 0.9em;
-            color: gold;
-        }
-
-        .form-group input, .form-group select {
-            padding: 12px;
-            border-radius: 10px;
-            border: 2px solid gold;
-            background: rgba(0,0,0,0.3);
-            color: white;
-            font-size: 1em;
-        }
-
-        .form-group input:focus, .form-group select:focus {
-            outline: none;
-            border-color: #ffd700;
-            box-shadow: 0 0 10px gold;
-        }
-
-        .form-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
         }
 
         /* Tables */
@@ -190,7 +133,6 @@
             overflow-x: auto;
             max-height: 400px;
             overflow-y: auto;
-            border-radius: 10px;
         }
 
         table {
@@ -202,7 +144,6 @@
             background: gold;
             color: black;
             padding: 12px;
-            font-weight: bold;
             position: sticky;
             top: 0;
         }
@@ -219,18 +160,12 @@
 
         /* Buttons */
         .btn {
-            padding: 10px 20px;
+            padding: 8px 15px;
             border: none;
-            border-radius: 25px;
+            border-radius: 20px;
             cursor: pointer;
             font-weight: bold;
-            transition: all 0.2s;
             margin: 2px;
-        }
-
-        .btn-primary {
-            background: gold;
-            color: black;
         }
 
         .btn-success {
@@ -248,22 +183,38 @@
             color: black;
         }
 
-        .btn-info {
-            background: #2196F3;
+        .btn-primary {
+            background: gold;
+            color: black;
+        }
+
+        /* Forms */
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: gold;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 10px;
+            border-radius: 10px;
+            border: 2px solid gold;
+            background: rgba(0,0,0,0.3);
             color: white;
         }
 
-        .btn:hover {
-            transform: scale(1.05);
-            box-shadow: 0 0 15px currentColor;
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
         }
 
-        .btn-sm {
-            padding: 5px 10px;
-            font-size: 0.8em;
-        }
-
-        /* Status Badges */
+        /* Status badges */
         .status-badge {
             padding: 5px 10px;
             border-radius: 20px;
@@ -281,11 +232,6 @@
             color: white;
         }
 
-        .status-rejected {
-            background: #f44336;
-            color: white;
-        }
-
         /* Modal */
         .modal {
             display: none;
@@ -295,9 +241,9 @@
             width: 100%;
             height: 100%;
             background: rgba(0,0,0,0.8);
-            z-index: 1000;
             justify-content: center;
             align-items: center;
+            z-index: 1000;
         }
 
         .modal.active {
@@ -305,7 +251,7 @@
         }
 
         .modal-content {
-            background: #16213e;
+            background: #1e3c72;
             padding: 30px;
             border-radius: 20px;
             border: 3px solid gold;
@@ -329,78 +275,6 @@
             cursor: pointer;
             color: gold;
         }
-
-        /* Loading */
-        .loading {
-            text-align: center;
-            padding: 40px;
-            color: gold;
-        }
-
-        .loading::after {
-            content: '';
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid gold;
-            border-top-color: transparent;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin-left: 10px;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        /* Logs */
-        .logs-container {
-            max-height: 400px;
-            overflow-y: auto;
-        }
-
-        .log-entry {
-            padding: 10px;
-            border-bottom: 1px solid rgba(255,215,0,0.3);
-            font-size: 0.9em;
-        }
-
-        .log-time {
-            color: gold;
-            font-weight: bold;
-        }
-
-        .log-admin {
-            color: #4CAF50;
-        }
-
-        .log-action {
-            color: #ff9800;
-        }
-
-        /* Quick Actions */
-        .quick-actions {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 10px;
-            margin-top: 15px;
-        }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            .header {
-                flex-direction: column;
-                text-align: center;
-            }
-            
-            .form-row {
-                grid-template-columns: 1fr;
-            }
-            
-            .stats-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-        }
     </style>
 </head>
 <body>
@@ -411,31 +285,26 @@
             <div class="admin-info">
                 <span id="adminName">Loading...</span> | 
                 <span id="adminId"></span>
-                <button class="btn btn-sm btn-info" onclick="refreshAll()" style="margin-left: 10px;">🔄 Refresh</button>
             </div>
         </div>
 
-        <!-- Stats Cards -->
-        <div class="stats-grid" id="statsContainer">
+        <!-- Stats -->
+        <div class="stats-grid">
             <div class="stat-card">
                 <div class="stat-value" id="totalUsers">0</div>
                 <div class="stat-label">Total Users</div>
             </div>
             <div class="stat-card">
                 <div class="stat-value" id="totalDeposits">0</div>
-                <div class="stat-label">Total Deposits (ETB)</div>
+                <div class="stat-label">Total Deposits</div>
             </div>
             <div class="stat-card">
                 <div class="stat-value" id="pendingCount">0</div>
-                <div class="stat-label">Pending Transactions</div>
+                <div class="stat-label">Pending</div>
             </div>
             <div class="stat-card">
                 <div class="stat-value" id="totalGames">0</div>
-                <div class="stat-label">Games Played</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="activeGames">0</div>
-                <div class="stat-label">Active Games</div>
+                <div class="stat-label">Games</div>
             </div>
         </div>
 
@@ -445,8 +314,6 @@
             <div class="tab" onclick="switchTab('transactions')">💰 Transactions</div>
             <div class="tab" onclick="switchTab('users')">👥 Users</div>
             <div class="tab" onclick="switchTab('settings')">⚙️ Settings</div>
-            <div class="tab" onclick="switchTab('games')">🎮 Games</div>
-            <div class="tab" onclick="switchTab('logs')">📋 Logs</div>
         </div>
 
         <!-- Dashboard Tab -->
@@ -454,13 +321,10 @@
             <div class="admin-card">
                 <div class="card-header">
                     <h2>⚡ Quick Actions</h2>
-                    <span class="badge">Admin</span>
                 </div>
-                <div class="quick-actions">
-                    <button class="btn btn-success" onclick="startNewGame()">🎮 Start New Game</button>
-                    <button class="btn btn-warning" onclick="showBroadcastModal()">📢 Broadcast</button>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                     <button class="btn btn-primary" onclick="refreshAll()">🔄 Refresh</button>
-                    <button class="btn btn-info" onclick="window.location.href='/admin?user=' + adminId">📊 Dashboard</button>
+                    <button class="btn btn-success" onclick="startNewGame()">🎮 New Game</button>
                 </div>
             </div>
 
@@ -468,21 +332,11 @@
                 <div class="card-header">
                     <h2>⚙️ Current Settings</h2>
                 </div>
-                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px;" id="currentSettings">
-                    <div>Game Type: <span id="currentGameType" style="color:gold;">full house</span></div>
-                    <div>Card Price: <span id="currentCardPrice" style="color:gold;">10</span> ETB</div>
-                    <div>Prize Pool: <span id="currentPrizePool" style="color:gold;">2000</span> ETB</div>
-                    <div>Min Cards: <span id="currentMinCards" style="color:gold;">10</span></div>
-                    <div>Call Interval: <span id="currentCallInterval" style="color:gold;">3</span> sec</div>
-                </div>
-            </div>
-
-            <div class="admin-card">
-                <div class="card-header">
-                    <h2>📈 Recent Activity</h2>
-                </div>
-                <div class="logs-container" id="recentActivity">
-                    <div class="loading">Loading...</div>
+                <div id="currentSettings">
+                    <p>Game Type: <span id="currentGameType">full house</span></p>
+                    <p>Card Price: <span id="currentCardPrice">10</span> ETB</p>
+                    <p>Prize Pool: <span id="currentPrizePool">2000</span> ETB</p>
+                    <p>Min Cards: <span id="currentMinCards">10</span></p>
                 </div>
             </div>
         </div>
@@ -492,7 +346,6 @@
             <div class="admin-card">
                 <div class="card-header">
                     <h2>💰 Pending Transactions</h2>
-                    <span class="badge" id="pendingBadge">0</span>
                 </div>
                 <div class="table-container">
                     <table>
@@ -506,7 +359,7 @@
                             </tr>
                         </thead>
                         <tbody id="transactionsList">
-                            <tr><td colspan="5" class="loading">Loading...</td></tr>
+                            <tr><td colspan="5">Loading...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -517,8 +370,8 @@
         <div id="users" class="tab-content">
             <div class="admin-card">
                 <div class="card-header">
-                    <h2>👥 User Management</h2>
-                    <input type="text" placeholder="Search users..." id="userSearch" onkeyup="searchUsers()" style="padding: 8px; border-radius: 20px; border: 1px solid gold; background: rgba(0,0,0,0.3); color: white;">
+                    <h2>👥 Users</h2>
+                    <input type="text" id="userSearch" placeholder="Search..." style="padding: 5px;">
                 </div>
                 <div class="table-container">
                     <table>
@@ -530,14 +383,11 @@
                                 <th>Balance</th>
                                 <th>Games</th>
                                 <th>Wins</th>
-                                <th>Deposits</th>
-                                <th>Phone</th>
-                                <th>Admin</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="usersList">
-                            <tr><td colspan="10" class="loading">Loading...</td></tr>
+                            <tr><td colspan="7">Loading...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -550,96 +400,30 @@
                 <div class="card-header">
                     <h2>⚙️ Game Settings</h2>
                 </div>
-                <div class="settings-form">
+                <div class="form-group">
+                    <label>Game Type</label>
+                    <select id="gameType">
+                        <option value="full house">Full House</option>
+                        <option value="1 row">1 Row</option>
+                        <option value="1 column">1 Column</option>
+                        <option value="4 corners">4 Corners</option>
+                    </select>
+                </div>
+                <div class="form-row">
                     <div class="form-group">
-                        <label>Game Type</label>
-                        <select id="gameType">
-                            <option value="full house">Full House</option>
-                            <option value="1 row">1 Row</option>
-                            <option value="1 column">1 Column</option>
-                            <option value="4 corners">4 Corners</option>
-                            <option value="X shape">X Shape</option>
-                            <option value="random">Random</option>
-                        </select>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>Card Price (ETB)</label>
-                            <input type="number" id="cardPrice" min="1" value="10">
-                        </div>
-                        <div class="form-group">
-                            <label>Prize Pool (ETB)</label>
-                            <input type="number" id="prizePool" min="100" value="2000">
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>Min Cards to Start</label>
-                            <input type="number" id="minCards" min="1" value="10">
-                        </div>
-                        <div class="form-group">
-                            <label>Call Interval (sec)</label>
-                            <input type="number" id="callInterval" min="1" max="10" value="3">
-                        </div>
-                    </div>
-                    <button class="btn btn-primary" onclick="saveSettings()">💾 Save Settings</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Games Tab -->
-        <div id="games" class="tab-content">
-            <div class="admin-card">
-                <div class="card-header">
-                    <h2>🎮 Active Games</h2>
-                </div>
-                <div class="table-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Session</th>
-                                <th>Type</th>
-                                <th>Cards Sold</th>
-                                <th>Players</th>
-                                <th>Prize</th>
-                                <th>Status</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="gamesList">
-                            <tr><td colspan="7" class="loading">Loading...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div class="admin-card">
-                <div class="card-header">
-                    <h2>🏆 Declare Winner</h2>
-                </div>
-                <div class="settings-form">
-                    <div class="form-group">
-                        <label>Session ID</label>
-                        <input type="text" id="winnerSession" placeholder="Enter session ID">
+                        <label>Card Price (ETB)</label>
+                        <input type="number" id="cardPrice" value="10">
                     </div>
                     <div class="form-group">
-                        <label>Winner User ID</label>
-                        <input type="text" id="winnerUserId" placeholder="Enter user ID">
+                        <label>Prize Pool (ETB)</label>
+                        <input type="number" id="prizePool" value="2000">
                     </div>
-                    <button class="btn btn-success" onclick="declareWinner()">🏆 Declare Winner</button>
                 </div>
-            </div>
-        </div>
-
-        <!-- Logs Tab -->
-        <div id="logs" class="tab-content">
-            <div class="admin-card">
-                <div class="card-header">
-                    <h2>📋 Admin Action Logs</h2>
+                <div class="form-group">
+                    <label>Min Cards to Start</label>
+                    <input type="number" id="minCards" value="10">
                 </div>
-                <div class="logs-container" id="logsList">
-                    <div class="loading">Loading...</div>
-                </div>
+                <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
             </div>
         </div>
     </div>
@@ -648,329 +432,181 @@
     <div id="balanceModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>💰 Edit User Balance</h3>
+                <h3>Edit Balance</h3>
                 <span class="close" onclick="closeModal('balanceModal')">&times;</span>
             </div>
-            <div class="settings-form">
-                <div class="form-group">
-                    <label>User</label>
-                    <input type="text" id="editUser" readonly>
-                </div>
-                <div class="form-group">
-                    <label>Current Balance</label>
-                    <input type="text" id="currentBalance" readonly>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Amount</label>
-                        <input type="number" id="editAmount" placeholder="Enter amount">
-                    </div>
-                    <div class="form-group">
-                        <label>Operation</label>
-                        <select id="editOperation">
-                            <option value="add">Add</option>
-                            <option value="subtract">Subtract</option>
-                        </select>
-                    </div>
-                </div>
-                <button class="btn btn-primary" onclick="updateBalance()">Update Balance</button>
+            <div class="form-group">
+                <label>User</label>
+                <input type="text" id="editUser" readonly>
             </div>
-        </div>
-    </div>
-
-    <!-- Broadcast Modal -->
-    <div id="broadcastModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>📢 Broadcast Message</h3>
-                <span class="close" onclick="closeModal('broadcastModal')">&times;</span>
+            <div class="form-group">
+                <label>Current Balance</label>
+                <input type="text" id="currentBalance" readonly>
             </div>
-            <div class="settings-form">
-                <div class="form-group">
-                    <label>Message</label>
-                    <textarea id="broadcastMessage" rows="4" placeholder="Enter message to send to all users..." style="padding: 10px; border-radius: 10px; background: rgba(0,0,0,0.3); color: white; border: 2px solid gold;"></textarea>
-                </div>
-                <button class="btn btn-primary" onclick="sendBroadcast()">Send Broadcast</button>
+            <div class="form-group">
+                <label>Amount</label>
+                <input type="number" id="editAmount">
+            </div>
+            <div class="form-row">
+                <button class="btn btn-success" onclick="updateBalance('add')">Add</button>
+                <button class="btn btn-danger" onclick="updateBalance('subtract')">Subtract</button>
             </div>
         </div>
     </div>
 
     <script>
-        // ==================== GLOBAL VARIABLES ====================
         const urlParams = new URLSearchParams(window.location.search);
         const adminId = urlParams.get('user');
         const API_URL = window.location.origin;
-        
-        let allUsers = [];
-        let pendingTransactions = [];
 
-        // ==================== INITIALIZATION ====================
+        let allUsers = [];
+
         window.onload = function() {
             if (!adminId) {
                 window.location.href = '/';
                 return;
             }
-            
-            document.getElementById('adminId').innerText = adminId;
             checkAdmin();
             loadStats();
             loadSettings();
             loadTransactions();
             loadUsers();
-            loadLogs();
-            
-            setInterval(() => {
-                loadStats();
-                loadTransactions();
-            }, 30000);
         };
 
-        // ==================== ADMIN CHECK ====================
         async function checkAdmin() {
             try {
-                let response = await fetch(`${API_URL}/api/admin/check/${adminId}`);
-                let data = await response.json();
-                
-                if (!data.success || !data.is_admin) {
-                    window.location.href = '/';
-                    return;
-                }
-                
-                let userResponse = await fetch(`${API_URL}/api/user/${adminId}`);
-                let userData = await userResponse.json();
-                if (userData.success) {
-                    document.getElementById('adminName').innerText = userData.username || 'Admin';
-                }
-                
-            } catch (error) {
-                console.error('Admin check failed:', error);
+                let res = await fetch(`${API_URL}/api/admin/check/${adminId}`);
+                let data = await res.json();
+                if (!data.is_admin) window.location.href = '/';
+                document.getElementById('adminId').innerText = adminId;
+            } catch (e) {
+                window.location.href = '/';
             }
         }
 
-        // ==================== TAB SWITCHING ====================
-        function switchTab(tabName) {
+        function switchTab(tab) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-            
             event.target.classList.add('active');
-            document.getElementById(tabName).classList.add('active');
+            document.getElementById(tab).classList.add('active');
         }
 
-        // ==================== LOAD STATS ====================
         async function loadStats() {
             try {
-                let response = await fetch(`${API_URL}/api/admin/stats?admin_id=${adminId}`);
-                let data = await response.json();
-                
+                let res = await fetch(`${API_URL}/api/admin/stats?admin_id=${adminId}`);
+                let data = await res.json();
                 if (data.success) {
                     document.getElementById('totalUsers').innerText = data.stats.total_users;
                     document.getElementById('totalDeposits').innerText = data.stats.total_deposits;
                     document.getElementById('totalGames').innerText = data.stats.total_games;
-                    document.getElementById('activeGames').innerText = data.stats.active_games;
                 }
-            } catch (error) {
-                console.error('Failed to load stats:', error);
-            }
+            } catch (e) {}
         }
 
-        // ==================== LOAD SETTINGS ====================
         async function loadSettings() {
             try {
-                let response = await fetch(`${API_URL}/api/admin/stats?admin_id=${adminId}`);
-                let data = await response.json();
-                
+                let res = await fetch(`${API_URL}/api/admin/stats?admin_id=${adminId}`);
+                let data = await res.json();
                 if (data.success && data.settings) {
                     document.getElementById('currentGameType').innerText = data.settings.game_type;
                     document.getElementById('currentCardPrice').innerText = data.settings.card_price;
                     document.getElementById('currentPrizePool').innerText = data.settings.prize_pool;
                     document.getElementById('currentMinCards').innerText = data.settings.min_cards_to_start;
-                    document.getElementById('currentCallInterval').innerText = data.settings.call_interval;
                     
                     document.getElementById('gameType').value = data.settings.game_type;
                     document.getElementById('cardPrice').value = data.settings.card_price;
                     document.getElementById('prizePool').value = data.settings.prize_pool;
                     document.getElementById('minCards').value = data.settings.min_cards_to_start;
-                    document.getElementById('callInterval').value = data.settings.call_interval;
                 }
-            } catch (error) {
-                console.error('Failed to load settings:', error);
-            }
+            } catch (e) {}
         }
 
-        // ==================== LOAD TRANSACTIONS ====================
         async function loadTransactions() {
             try {
-                let response = await fetch(`${API_URL}/api/admin/transactions?admin_id=${adminId}`);
-                let data = await response.json();
-                
+                let res = await fetch(`${API_URL}/api/admin/transactions?admin_id=${adminId}`);
+                let data = await res.json();
                 if (data.success) {
-                    pendingTransactions = data.transactions;
-                    document.getElementById('pendingBadge').innerText = data.transactions.length;
                     document.getElementById('pendingCount').innerText = data.transactions.length;
-                    
                     let tbody = document.getElementById('transactionsList');
                     tbody.innerHTML = '';
-                    
-                    if (data.transactions.length === 0) {
-                        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">No pending transactions</td></tr>';
-                        return;
-                    }
-                    
                     data.transactions.forEach(tx => {
                         let row = tbody.insertRow();
                         row.innerHTML = `
                             <td>${new Date(tx.created_at).toLocaleString()}</td>
                             <td>@${tx.username || tx.name}</td>
-                            <td><strong>${tx.amount} ETB</strong></td>
+                            <td>${tx.amount} ETB</td>
                             <td><small>${tx.tx_id}</small></td>
                             <td>
-                                <button class="btn btn-success btn-sm" onclick="approveTransaction('${tx.tx_id}')">✅ Approve</button>
-                                <button class="btn btn-danger btn-sm" onclick="rejectTransaction('${tx.tx_id}')">❌ Reject</button>
+                                <button class="btn btn-success" onclick="approveTx('${tx.tx_id}')">✅</button>
+                                <button class="btn btn-danger" onclick="rejectTx('${tx.tx_id}')">❌</button>
                             </td>
                         `;
                     });
                 }
-            } catch (error) {
-                console.error('Failed to load transactions:', error);
-            }
+            } catch (e) {}
         }
 
-        // ==================== LOAD USERS ====================
         async function loadUsers() {
             try {
-                let response = await fetch(`${API_URL}/api/admin/users?admin_id=${adminId}`);
-                let data = await response.json();
-                
+                let res = await fetch(`${API_URL}/api/admin/users?admin_id=${adminId}`);
+                let data = await res.json();
                 if (data.success) {
                     allUsers = data.users;
                     displayUsers(data.users);
                 }
-            } catch (error) {
-                console.error('Failed to load users:', error);
-            }
+            } catch (e) {}
         }
 
         function displayUsers(users) {
             let tbody = document.getElementById('usersList');
             tbody.innerHTML = '';
-            
-            users.forEach(user => {
+            users.forEach(u => {
                 let row = tbody.insertRow();
                 row.innerHTML = `
-                    <td>${user.telegram_id}</td>
-                    <td>@${user.username || '-'}</td>
-                    <td>${user.name}</td>
-                    <td><strong>${user.balance} ETB</strong></td>
-                    <td>${user.games_played}</td>
-                    <td>${user.wins} ETB</td>
-                    <td>${user.total_deposits} ETB</td>
-                    <td>${user.phone || '-'}</td>
-                    <td>${user.is_admin ? '👑' : '-'}</td>
+                    <td>${u.telegram_id}</td>
+                    <td>@${u.username || '-'}</td>
+                    <td>${u.name}</td>
+                    <td>${u.balance} ETB</td>
+                    <td>${u.games_played}</td>
+                    <td>${u.wins} ETB</td>
                     <td>
-                        <button class="btn btn-warning btn-sm" onclick="editBalance('${user.telegram_id}', '${user.name}', ${user.balance})">💰 Edit</button>
+                        <button class="btn btn-warning" onclick="editBalance('${u.telegram_id}', '${u.name}', ${u.balance})">💰</button>
                     </td>
                 `;
             });
         }
 
-        function searchUsers() {
-            let search = document.getElementById('userSearch').value.toLowerCase();
-            let filtered = allUsers.filter(user => 
-                (user.username && user.username.toLowerCase().includes(search)) ||
-                (user.name && user.name.toLowerCase().includes(search)) ||
-                user.telegram_id.toString().includes(search)
+        document.getElementById('userSearch').addEventListener('input', function(e) {
+            let search = e.target.value.toLowerCase();
+            let filtered = allUsers.filter(u => 
+                u.username?.toLowerCase().includes(search) ||
+                u.name.toLowerCase().includes(search) ||
+                u.telegram_id.toString().includes(search)
             );
             displayUsers(filtered);
+        });
+
+        async function approveTx(txId) {
+            if (!confirm('Approve?')) return;
+            await fetch(`${API_URL}/api/admin/approve-transaction`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({admin_id: adminId, tx_id: txId})
+            });
+            loadTransactions();
+            loadStats();
         }
 
-        // ==================== LOAD LOGS ====================
-        async function loadLogs() {
-            try {
-                let response = await fetch(`${API_URL}/api/admin/logs?admin_id=${adminId}`);
-                let data = await response.json();
-                
-                if (data.success) {
-                    let logsDiv = document.getElementById('logsList');
-                    let recentDiv = document.getElementById('recentActivity');
-                    
-                    if (logsDiv) {
-                        logsDiv.innerHTML = '';
-                        data.logs.slice(0, 20).forEach(log => {
-                            let entry = document.createElement('div');
-                            entry.className = 'log-entry';
-                            entry.innerHTML = `
-                                <span class="log-time">[${new Date(log.time).toLocaleString()}]</span>
-                                <span class="log-admin">${log.admin}</span>
-                                <span class="log-action">${log.action}</span>
-                                <span>${log.details}</span>
-                            `;
-                            logsDiv.appendChild(entry);
-                        });
-                    }
-                    
-                    if (recentDiv) {
-                        recentDiv.innerHTML = '';
-                        data.logs.slice(0, 5).forEach(log => {
-                            let entry = document.createElement('div');
-                            entry.className = 'log-entry';
-                            entry.innerHTML = `
-                                <span class="log-time">[${new Date(log.time).toLocaleTimeString()}]</span>
-                                <span class="log-action">${log.action}</span>
-                            `;
-                            recentDiv.appendChild(entry);
-                        });
-                    }
-                }
-            } catch (error) {
-                console.error('Failed to load logs:', error);
-            }
+        async function rejectTx(txId) {
+            if (!confirm('Reject?')) return;
+            await fetch(`${API_URL}/api/admin/reject-transaction`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({admin_id: adminId, tx_id: txId})
+            });
+            loadTransactions();
         }
 
-        // ==================== TRANSACTION ACTIONS ====================
-        async function approveTransaction(txId) {
-            if (!confirm('Approve this transaction?')) return;
-            
-            try {
-                let response = await fetch(`${API_URL}/api/admin/approve-transaction`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ admin_id: adminId, tx_id: txId })
-                });
-                
-                let data = await response.json();
-                if (data.success) {
-                    alert('Transaction approved!');
-                    loadTransactions();
-                    loadStats();
-                    loadLogs();
-                }
-            } catch (error) {
-                alert('Failed to approve transaction');
-            }
-        }
-
-        async function rejectTransaction(txId) {
-            if (!confirm('Reject this transaction?')) return;
-            
-            try {
-                let response = await fetch(`${API_URL}/api/admin/reject-transaction`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ admin_id: adminId, tx_id: txId })
-                });
-                
-                let data = await response.json();
-                if (data.success) {
-                    alert('Transaction rejected!');
-                    loadTransactions();
-                    loadLogs();
-                }
-            } catch (error) {
-                alert('Failed to reject transaction');
-            }
-        }
-
-        // ==================== SETTINGS ====================
         async function saveSettings() {
             let settings = {
                 admin_id: adminId,
@@ -978,166 +614,75 @@
                 card_price: parseInt(document.getElementById('cardPrice').value),
                 prize_pool: parseInt(document.getElementById('prizePool').value),
                 min_cards_to_start: parseInt(document.getElementById('minCards').value),
-                call_interval: parseInt(document.getElementById('callInterval').value)
+                call_interval: 3
             };
-            
-            try {
-                let response = await fetch(`${API_URL}/api/admin/update-settings`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(settings)
-                });
-                
-                let data = await response.json();
-                if (data.success) {
-                    alert('Settings saved!');
-                    loadSettings();
-                    loadLogs();
-                }
-            } catch (error) {
-                alert('Failed to save settings');
-            }
+            await fetch(`${API_URL}/api/admin/update-settings`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(settings)
+            });
+            alert('Settings saved!');
+            loadSettings();
         }
 
-        // ==================== USER BALANCE ====================
         let currentEditUser = null;
-        
         function editBalance(telegramId, name, balance) {
             currentEditUser = telegramId;
             document.getElementById('editUser').value = `${name} (${telegramId})`;
             document.getElementById('currentBalance').value = balance + ' ETB';
             document.getElementById('editAmount').value = '';
-            document.getElementById('editOperation').value = 'add';
             openModal('balanceModal');
         }
 
-        async function updateBalance() {
+        async function updateBalance(op) {
             let amount = parseInt(document.getElementById('editAmount').value);
-            let operation = document.getElementById('editOperation').value;
+            if (!amount) return alert('Enter amount');
             
-            if (!amount || amount <= 0) {
-                alert('Please enter a valid amount');
-                return;
-            }
-            
-            try {
-                let response = await fetch(`${API_URL}/api/admin/update-balance`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        admin_id: adminId,
-                        target_id: currentEditUser,
-                        amount: amount,
-                        operation: operation
-                    })
-                });
-                
-                let data = await response.json();
-                if (data.success) {
-                    alert(`Balance updated! New balance: ${data.new_balance} ETB`);
-                    closeModal('balanceModal');
-                    loadUsers();
-                    loadStats();
-                    loadLogs();
-                }
-            } catch (error) {
-                alert('Failed to update balance');
-            }
+            await fetch(`${API_URL}/api/admin/update-balance`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    admin_id: adminId,
+                    target_id: currentEditUser,
+                    amount: amount,
+                    operation: op
+                })
+            });
+            closeModal('balanceModal');
+            loadUsers();
+            loadStats();
         }
 
-        // ==================== GAME ACTIONS ====================
         async function startNewGame() {
-            if (!confirm('Start a new game session?')) return;
-            
-            try {
-                let response = await fetch(`${API_URL}/api/admin/start-game`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ admin_id: adminId })
-                });
-                
-                let data = await response.json();
-                if (data.success) {
-                    alert(`New game started! Session ID: ${data.session_id}`);
-                    loadLogs();
-                }
-            } catch (error) {
-                alert('Failed to start game');
-            }
+            if (!confirm('Start new game?')) return;
+            await fetch(`${API_URL}/api/admin/start-game`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({admin_id: adminId})
+            });
+            alert('Game started!');
         }
 
-        async function declareWinner() {
-            let sessionId = document.getElementById('winnerSession').value;
-            let userId = document.getElementById('winnerUserId').value;
-            
-            if (!sessionId || !userId) {
-                alert('Please fill all fields');
-                return;
-            }
-            
-            try {
-                let response = await fetch(`${API_URL}/api/admin/end-game`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        admin_id: adminId,
-                        session_id: sessionId,
-                        winner_id: userId,
-                        winning_card: 'Full House'
-                    })
-                });
-                
-                let data = await response.json();
-                if (data.success) {
-                    alert('Winner declared!');
-                    loadLogs();
-                }
-            } catch (error) {
-                alert('Failed to declare winner');
-            }
-        }
-
-        // ==================== BROADCAST ====================
-        function showBroadcastModal() {
-            openModal('broadcastModal');
-        }
-
-        async function sendBroadcast() {
-            let message = document.getElementById('broadcastMessage').value;
-            
-            if (!message) {
-                alert('Please enter a message');
-                return;
-            }
-            
-            alert('Broadcast feature coming soon!');
-            closeModal('broadcastModal');
-        }
-
-        // ==================== MODAL FUNCTIONS ====================
-        function openModal(modalId) {
-            document.getElementById(modalId).classList.add('active');
-        }
-
-        function closeModal(modalId) {
-            document.getElementById(modalId).classList.remove('active');
-        }
-
-        // ==================== REFRESH ====================
         function refreshAll() {
             loadStats();
             loadSettings();
             loadTransactions();
             loadUsers();
-            loadLogs();
         }
 
-        // Close modal when clicking outside
-        window.onclick = function(event) {
-            if (event.target.classList.contains('modal')) {
-                event.target.classList.remove('active');
-            }
+        function openModal(id) {
+            document.getElementById(id).classList.add('active');
         }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.remove('active');
+        }
+
+        window.onclick = function(e) {
+            if (e.target.classList.contains('modal')) {
+                e.target.classList.remove('active');
+            }
+        };
     </script>
 </body>
 </html>
