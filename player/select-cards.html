@@ -15,34 +15,41 @@
         body {
             background: #f0f0f0;
             padding: 20px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
         }
 
         .container {
             max-width: 1200px;
-            width: 100%;
+            margin: 0 auto;
             background: white;
             border: 3px solid #333;
             padding: 20px;
         }
 
-        /* የቁጥር ግሪድ 1-1000 - እንደ ምስሉ ነገር ግን እስከ 1000 */
+        /* የቁጥር ግሪድ 1-1000 */
+        .numbers-section {
+            margin-bottom: 30px;
+        }
+
+        .numbers-section h2 {
+            font-size: 24px;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+
         .numbers-grid {
             display: grid;
             grid-template-columns: repeat(20, 1fr);
             gap: 2px;
             background: #333;
             padding: 2px;
-            margin-bottom: 30px;
             border: 2px solid #333;
+            max-height: 400px;
+            overflow-y: auto;
         }
 
         .number-cell {
             background: white;
-            padding: 4px 2px;
+            padding: 5px 2px;
             text-align: center;
             font-size: 11px;
             font-weight: bold;
@@ -53,10 +60,19 @@
             background: #90EE90;
         }
 
-        /* የቢንጎ ካርድ - እንደ ምስሉ */
+        /* የቢንጎ ካርድ */
+        .bingo-section {
+            margin: 30px 0;
+        }
+
+        .bingo-section h2 {
+            font-size: 24px;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+
         .bingo-card {
             border: 3px solid #333;
-            margin: 30px 0;
             padding: 20px;
             background: white;
         }
@@ -89,30 +105,38 @@
         .bingo-cell {
             background: white;
             text-align: center;
-            padding: 20px 10px;
-            font-size: 22px;
+            padding: 15px 10px;
+            font-size: 20px;
             font-weight: bold;
             border: 1px solid #999;
         }
 
         .free-cell {
             background: #FFD700;
-            font-size: 28px;
         }
 
-        /* የካርድ ቁጥሮች - እንደ ምስሉ */
+        /* የካርድ ቁጥሮች */
+        .card-numbers-section {
+            margin: 30px 0;
+        }
+
+        .card-numbers-section h2 {
+            font-size: 24px;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+
         .card-numbers {
             display: flex;
             flex-wrap: wrap;
             gap: 8px;
-            margin: 20px 0;
             padding: 15px;
             border: 3px solid #333;
             background: #f9f9f9;
         }
 
         .card-number-item {
-            padding: 5px 10px;
+            padding: 8px 12px;
             background: white;
             border: 2px solid #333;
             font-size: 16px;
@@ -121,18 +145,21 @@
             text-align: center;
         }
 
-        /* የተመረጡ ካርዶች ዝርዝር - እንደ ምስሉ */
-        .cards-list {
+        /* የተመረጡ ካርዶች */
+        .selected-cards-section {
             margin: 30px 0;
-            padding: 20px;
-            border: 3px solid #333;
-            background: #f9f9f9;
         }
 
-        .cards-list h3 {
-            margin-bottom: 20px;
-            font-size: 22px;
+        .selected-cards-section h2 {
+            font-size: 24px;
+            margin-bottom: 15px;
             font-weight: bold;
+        }
+
+        .cards-list {
+            border: 3px solid #333;
+            padding: 20px;
+            background: #f9f9f9;
         }
 
         .cards-list ul {
@@ -140,17 +167,17 @@
         }
 
         .cards-list li {
-            padding: 10px;
+            padding: 12px;
             margin: 5px 0;
             background: white;
             border: 2px solid #333;
-            font-family: monospace;
             font-size: 18px;
             font-weight: bold;
             text-align: center;
+            font-family: monospace;
         }
 
-        /* Confirm/Cancel Buttons - እንደ ምስሉ */
+        /* Confirm/Cancel Buttons */
         .action-buttons {
             display: flex;
             gap: 20px;
@@ -159,18 +186,12 @@
 
         .btn {
             flex: 1;
-            padding: 15px;
-            font-size: 24px;
+            padding: 20px;
+            font-size: 28px;
             font-weight: bold;
             border: 3px solid #333;
-            background: white;
             cursor: pointer;
             text-transform: uppercase;
-        }
-
-        .btn:hover {
-            background: #333;
-            color: white;
         }
 
         .btn-confirm {
@@ -181,6 +202,10 @@
         .btn-cancel {
             background: #f44336;
             color: white;
+        }
+
+        .btn:hover {
+            opacity: 0.8;
         }
 
         /* ማስታወሻ */
@@ -196,37 +221,48 @@
 </head>
 <body>
     <div class="container">
-        <!-- የቁጥር ግሪድ 1-1000 (እንደ ምስሉ ነገር ግን እስከ 1000) -->
-        <div class="numbers-grid" id="numberGrid"></div>
-
-        <!-- የቢንጎ ካርድ (እንደ ምስሉ) -->
-        <div class="bingo-card">
-            <div class="bingo-title">B I N G O</div>
-            <div class="bingo-grid" id="bingoGrid"></div>
+        <!-- የቁጥር ግሪድ 1-1000 -->
+        <div class="numbers-section">
+            <h2>ቁጥሮች 1-1000</h2>
+            <div class="numbers-grid" id="numberGrid"></div>
         </div>
 
-        <!-- የካርድ ቁጥሮች (እንደ ምስሉ) -->
-        <div class="card-numbers" id="cardNumbers"></div>
-
-        <!-- የተመረጡ ካርዶች ዝርዝር (እንደ ምስሉ 5 ረድፎች) -->
-        <div class="cards-list">
-            <h3>የተመረጡ ካርዶች ቁጥሮች:</h3>
-            <ul id="selectedCardsList"></ul>
+        <!-- የቢንጎ ካርድ -->
+        <div class="bingo-section">
+            <h2>የቢንጎ ካርድ</h2>
+            <div class="bingo-card">
+                <div class="bingo-title">B I N G O</div>
+                <div class="bingo-grid" id="bingoGrid"></div>
+            </div>
         </div>
 
-        <!-- Confirm/Cancel Buttons (እንደ ምስሉ) -->
+        <!-- የካርድ ቁጥሮች -->
+        <div class="card-numbers-section">
+            <h2>የካርድ ቁጥሮች</h2>
+            <div class="card-numbers" id="cardNumbers"></div>
+        </div>
+
+        <!-- የተመረጡ ካርዶች -->
+        <div class="selected-cards-section">
+            <h2>የተመረጡ ካርዶች</h2>
+            <div class="cards-list">
+                <ul id="selectedCardsList"></ul>
+            </div>
+        </div>
+
+        <!-- Confirm/Cancel Buttons -->
         <div class="action-buttons">
             <button class="btn btn-confirm" onclick="confirmSelection()">Confirm</button>
             <button class="btn btn-cancel" onclick="cancelSelection()">Cancel</button>
         </div>
 
         <div class="note">
-            * አረንጓዴ ቀለም ያላቸው ቁጥሮች የተጠሩ ቁጥሮች ናቸው (ከ1-1000)
+            * አረንጓዴ ቀለም ያላቸው ቁጥሮች የተጠሩ ቁጥሮች ናቸው
         </div>
     </div>
 
     <script>
-        // ==================== የቁጥር ግሪድ 1-1000 ማመንጨት ====================
+        // ==================== 1. የቁጥር ግሪድ 1-1000 ማመንጨት ====================
         function generateNumberGrid() {
             const grid = document.getElementById('numberGrid');
             
@@ -239,7 +275,7 @@
             }
         }
 
-        // ==================== የቢንጎ ካርድ ማመንጨት (እንደ ምስሉ) ====================
+        // ==================== 2. የቢንጎ ካርድ ማመንጨት ====================
         function generateBingoCard() {
             const grid = document.getElementById('bingoGrid');
             
@@ -252,7 +288,7 @@
                 grid.appendChild(header);
             });
 
-            // ከምስሉ የተወሰዱ ቁጥሮች (እነዚህ በካርዱ ላይ ይታያሉ)
+            // የቢንጎ ካርድ ቁጥሮች (እንደ ምስሉ)
             const cardNumbers = [
                 [13, 29, 40, 53, 71],
                 [5, 25, 34, 51, 68],
@@ -265,24 +301,34 @@
             cardNumbers.forEach(row => {
                 row.forEach(num => {
                     const cell = document.createElement('div');
-                    cell.className = num === '*' ? 'bingo-cell free-cell' : 'bingo-cell';
+                    if (num === '*') {
+                        cell.className = 'bingo-cell free-cell';
+                    } else {
+                        cell.className = 'bingo-cell';
+                    }
                     cell.textContent = num;
                     grid.appendChild(cell);
                 });
             });
-
-            // እነዚህን ቁጥሮች ለማስታወስ
-            return cardNumbers;
         }
 
-        // ==================== የካርድ ቁጥሮች ማሳየት (እንደ ምስሉ) ====================
+        // ==================== 3. የካርድ ቁጥሮች ማሳየት ====================
         function displayCardNumbers() {
             const container = document.getElementById('cardNumbers');
-            // ከምስሉ የተወሰዱ ቁጥሮች (24 ቁጥሮች + 1 ነፃ)
-            const numbers = [13, 29, 40, 53, 71, 5, 25, 34, 51, 68, 8, 20, 57, 73, 7, 21, 37, 60, 72, 4, 26, 35, 49, 67];
             
+            // ከምስሉ የተወሰዱ ቁጥሮች (24 ቁጥሮች)
+            const numbers = [
+                13, 29, 40, 53, 71,
+                5, 25, 34, 51, 68,
+                8, 20, 57, 73,
+                7, 21, 37, 60, 72,
+                4, 26, 35, 49, 67
+            ];
+            
+            // ቁጥሮችን ደርድር
             numbers.sort((a, b) => a - b);
             
+            // እያንዳንዱን ቁጥር አሳይ
             numbers.forEach(num => {
                 const span = document.createElement('span');
                 span.className = 'card-number-item';
@@ -291,30 +337,41 @@
             });
         }
 
-        // ==================== የተመረጡ ካርዶች ዝርዝር (እንደ ምስሉ) ====================
+        // ==================== 4. የተመረጡ ካርዶች ዝርዝር ====================
         function displaySelectedCards() {
             const list = document.getElementById('selectedCardsList');
             
             // ከምስሉ የተወሰዱ 5 ካርዶች
             const cards = [
-                [13, 29, 40, 53, 71],
-                [5, 25, 34, 51, 68],
-                [8, 20, '*', 57, 73],
-                [7, 21, 37, 60, 72],
-                [4, 26, 35, 49, 67]
+                '13   29   40   53   71',
+                '5    25   34   51   68',
+                '8    20    *   57   73',
+                '7    21   37   60   72',
+                '4    26   35   49   67'
             ];
 
             cards.forEach(card => {
                 const li = document.createElement('li');
-                li.textContent = card.join('   ');
+                li.textContent = card;
                 list.appendChild(li);
             });
         }
 
-        // ==================== የተጠሩ ቁጥሮችን ማጉላት ====================
+        // ==================== 5. የተጠሩ ቁጥሮችን ማጉላት ====================
         function highlightCalledNumbers() {
             // ከምስሉ የተወሰዱ የተጠሩ ቁጥሮች
-            const calledNumbers = [13, 29, 40, 53, 71, 5, 25, 34, 51, 68, 8, 20, 57, 73, 7, 21, 37, 60, 72, 4, 26, 35, 49, 67];
+            const calledNumbers = [
+                13, 29, 40, 53, 71,
+                5, 25, 34, 51, 68,
+                8, 20, 57, 73,
+                7, 21, 37, 60, 72,
+                4, 26, 35, 49, 67
+            ];
+            
+            // በተጨማሪ አንዳንድ ቁጥሮች ከ1-1000
+            for (let i = 1; i <= 1000; i += 7) {
+                calledNumbers.push(i);
+            }
             
             calledNumbers.forEach(num => {
                 const cell = document.getElementById(`num-${num}`);
@@ -324,20 +381,7 @@
             });
         }
 
-        // ==================== ተጨማሪ ቁጥሮችን ማጉላት (ከ1-1000 የተለያዩ) ====================
-        function highlightMoreNumbers() {
-            // ተጨማሪ የተጠሩ ቁጥሮች (ከላይ ካሉት በተጨማሪ)
-            const moreNumbers = [1, 15, 30, 45, 60, 75, 90, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000];
-            
-            moreNumbers.forEach(num => {
-                const cell = document.getElementById(`num-${num}`);
-                if (cell) {
-                    cell.classList.add('called');
-                }
-            });
-        }
-
-        // ==================== Confirm function ====================
+        // ==================== 6. Confirm function ====================
         function confirmSelection() {
             const selectedCards = [
                 [13, 29, 40, 53, 71],
@@ -362,7 +406,7 @@
             // window.location.href = 'payment.html';
         }
 
-        // ==================== Cancel function ====================
+        // ==================== 7. Cancel function ====================
         function cancelSelection() {
             if (confirm('እርግጠኛ ነዎት መሰረዝ ይፈልጋሉ?')) {
                 window.location.href = 'dashboard.html';
@@ -375,7 +419,6 @@
         displayCardNumbers();
         displaySelectedCards();
         highlightCalledNumbers();
-        highlightMoreNumbers(); // ተጨማሪ ቁጥሮችን ለማጉላት
     </script>
 </body>
 </html>
