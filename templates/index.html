@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MK BINGO - Real Game</title>
+    <title>MK BINGO - Cards Side by Side</title>
     <style>
         * {
             box-sizing: border-box;
@@ -16,173 +16,76 @@
             background: linear-gradient(135deg, #1e3c72, #2a5298);
             min-height: 100vh;
             color: white;
-            padding: 10px;
+            padding: 8px;
         }
 
         .container {
-            max-width: 600px;
+            max-width: 100%;
             margin: 0 auto;
             background: rgba(255, 255, 255, 0.1);
-            padding: 15px;
-            border-radius: 20px;
+            padding: 10px;
+            border-radius: 15px;
             backdrop-filter: blur(10px);
             border: 2px solid rgba(255,215,0,0.3);
         }
 
         h1 {
             text-align: center;
-            font-size: 2em;
-            margin-bottom: 10px;
+            font-size: 1.8em;
+            margin-bottom: 5px;
             color: gold;
-            text-shadow: 0 0 10px gold;
+            text-shadow: 0 0 5px gold;
         }
 
-        /* Balance Box */
+        /* Balance Box - Mini */
         .balance-box {
             background: rgba(0,0,0,0.5);
-            padding: 10px;
-            border-radius: 15px;
-            max-width: 200px;
-            margin: 10px auto;
-            border: 2px solid gold;
+            padding: 5px 10px;
+            border-radius: 20px;
+            max-width: 150px;
+            margin: 5px auto;
+            border: 1px solid gold;
             text-align: center;
-        }
-
-        .balance-box span {
-            font-size: 1.5em;
-            font-weight: bold;
-            color: gold;
-        }
-
-        /* Game Status */
-        .game-info {
-            background: rgba(0,0,0,0.3);
-            padding: 10px;
-            border-radius: 10px;
-            margin: 10px 0;
-            display: flex;
-            justify-content: space-around;
             font-size: 0.9em;
         }
 
-        .info-item {
-            text-align: center;
+        .balance-box span {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: gold;
+        }
+
+        /* Game Status - Mini Row */
+        .game-info {
+            background: rgba(0,0,0,0.3);
+            padding: 8px;
+            border-radius: 10px;
+            margin: 8px 0;
+            display: flex;
+            justify-content: space-around;
+            font-size: 0.85em;
         }
 
         .info-value {
-            font-size: 1.2em;
-            color: gold;
-        }
-
-        /* Card Selection Grid */
-        .grid-container {
-            background: rgba(0,0,0,0.3);
-            border-radius: 10px;
-            padding: 10px;
-            margin: 10px 0;
-            max-height: 300px;
-            overflow-y: auto;
-        }
-
-        #grid {
-            display: grid;
-            grid-template-columns: repeat(20, 1fr);
-            gap: 2px;
-        }
-
-        .box {
-            background: white;
-            color: black;
-            padding: 5px 0;
-            border-radius: 3px;
-            font-size: 0.6em;
-            text-align: center;
-            cursor: pointer;
-            border: 1px solid #ccc;
-        }
-
-        .box.selected {
-            background: #4CAF50;
-            color: white;
-            border-color: gold;
-        }
-
-        /* Summary Bar */
-        .summary-bar {
-            display: flex;
-            justify-content: space-between;
-            background: rgba(0,0,0,0.3);
-            padding: 10px 15px;
-            border-radius: 20px;
-            margin: 10px 0;
-            font-size: 1em;
-        }
-
-        .summary-bar span {
-            color: gold;
-            font-weight: bold;
-        }
-
-        /* Buttons */
-        button {
-            padding: 12px 25px;
-            font-size: 1em;
-            border: none;
-            border-radius: 25px;
-            background: #4CAF50;
-            color: white;
-            cursor: pointer;
-            margin: 5px;
-            font-weight: bold;
-        }
-
-        .cancel-btn {
-            background: #f44336;
-        }
-
-        /* ===== GAME PAGE STYLES ===== */
-        .game-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 15px;
-            padding: 5px 0;
-        }
-
-        .game-title {
-            font-size: 1.2em;
-        }
-
-        .game-title .game-info {
-            color: gold;
-            font-weight: bold;
-        }
-
-        .timer {
-            font-size: 2em;
             font-weight: bold;
             color: gold;
-            text-shadow: 0 0 10px gold;
         }
 
-        /* Mode Toggle */
-        .mode-section {
-            margin: 15px 0;
-        }
-
-        .mode-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: rgba(0,0,0,0.3);
-            padding: 15px;
-            border-radius: 10px;
+        /* ===== AUTO/MANUAL TOGGLE ===== */
+        .mode-container {
+            background: rgba(0,0,0,0.4);
+            padding: 8px;
+            border-radius: 30px;
+            margin: 8px 0;
             border: 2px solid gold;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
 
-        .mode-option {
-            font-size: 1.1em;
+        .mode-label {
             font-weight: bold;
+            font-size: 0.9em;
         }
 
         .mode-manual {
@@ -196,8 +99,8 @@
         .toggle-switch {
             position: relative;
             display: inline-block;
-            width: 100px;
-            height: 40px;
+            width: 80px;
+            height: 34px;
         }
 
         .toggle-switch input {
@@ -215,24 +118,24 @@
             bottom: 0;
             background: linear-gradient(135deg, #f44336, #d32f2f);
             transition: .4s;
-            border-radius: 40px;
+            border-radius: 34px;
             border: 2px solid white;
         }
 
         .slider:before {
             position: absolute;
             content: "MANUAL";
-            height: 32px;
-            width: 50px;
+            height: 26px;
+            width: 40px;
             left: 4px;
             bottom: 3px;
             background: white;
             transition: .4s;
-            border-radius: 32px;
+            border-radius: 26px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 0.7em;
+            font-size: 0.6em;
             font-weight: bold;
             color: black;
         }
@@ -243,71 +146,72 @@
 
         input:checked + .slider:before {
             content: "AUTO";
-            transform: translateX(50px);
+            transform: translateX(40px);
         }
 
         .mode-status {
             text-align: center;
-            margin-top: 10px;
-            padding: 8px;
+            font-size: 0.8em;
+            padding: 4px;
+            margin: 5px 0;
+            border-radius: 20px;
             background: rgba(76, 175, 80, 0.3);
-            border-radius: 30px;
-            font-size: 0.9em;
-            border: 1px solid #4CAF50;
         }
 
-        /* Called Numbers */
+        /* Called Numbers - Compact */
         .called-section {
-            margin: 20px 0;
+            margin: 8px 0;
         }
 
         .called-title {
-            font-size: 1em;
-            margin-bottom: 10px;
+            font-size: 0.9em;
+            margin-bottom: 5px;
             color: gold;
         }
 
         .called-numbers {
+            background: rgba(0,0,0,0.3);
+            padding: 8px;
+            border-radius: 10px;
             display: flex;
             flex-wrap: wrap;
-            gap: 10px;
-            min-height: 60px;
+            gap: 5px;
+            min-height: 50px;
         }
 
         .number-ball {
             display: inline-block;
-            width: 45px;
-            height: 45px;
+            width: 32px;
+            height: 32px;
             border-radius: 50%;
             background: gold;
             color: black;
             text-align: center;
-            line-height: 45px;
+            line-height: 32px;
             font-weight: bold;
-            font-size: 1.1em;
-            box-shadow: 0 3px 8px rgba(0,0,0,0.5);
+            font-size: 0.9em;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
         }
 
         /* BINGO Button */
         .bingo-btn-container {
             text-align: center;
-            margin: 25px 0;
+            margin: 10px 0;
         }
 
         .bingo-btn {
             background: #f44336;
             color: white;
-            font-size: 2.2em;
+            font-size: 1.5em;
             font-weight: bold;
-            padding: 15px 50px;
+            padding: 10px 30px;
             border: none;
-            border-radius: 60px;
+            border-radius: 40px;
             cursor: pointer;
-            box-shadow: 0 0 30px #f44336;
+            box-shadow: 0 0 20px #f44336;
             animation: bingoPulse 1.5s infinite;
-            letter-spacing: 3px;
-            border: 3px solid white;
             width: 100%;
+            letter-spacing: 2px;
         }
 
         .bingo-btn:disabled {
@@ -317,78 +221,121 @@
 
         @keyframes bingoPulse {
             0% { transform: scale(1); box-shadow: 0 0 20px #f44336; }
-            50% { transform: scale(1.02); box-shadow: 0 0 40px #f44336; }
+            50% { transform: scale(1.02); box-shadow: 0 0 30px #f44336; }
             100% { transform: scale(1); box-shadow: 0 0 20px #f44336; }
         }
 
-        /* Cards Container */
+        /* ===== CARDS SIDE BY SIDE - HORIZONTAL SCROLL ===== */
         .cards-container {
             display: flex;
-            flex-direction: column;
-            gap: 25px;
-            margin: 20px 0;
-            max-height: 500px;
-            overflow-y: auto;
-            padding: 5px;
+            gap: 12px;
+            overflow-x: auto;
+            overflow-y: hidden;
+            padding: 10px 5px;
+            margin: 10px 0;
+            scrollbar-width: thin;
+            scrollbar-color: gold #333;
+            white-space: nowrap;
+            min-height: 280px;
         }
 
-        /* BINGO Card Style */
+        .cards-container::-webkit-scrollbar {
+            height: 8px;
+        }
+
+        .cards-container::-webkit-scrollbar-track {
+            background: #333;
+            border-radius: 4px;
+        }
+
+        .cards-container::-webkit-scrollbar-thumb {
+            background: gold;
+            border-radius: 4px;
+        }
+
+        /* MINIMIZED 5x5 CARD - 200px width */
         .bingo-card {
             background: white;
-            border-radius: 15px;
-            padding: 15px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            border-radius: 10px;
+            padding: 8px;
+            min-width: 200px;
+            max-width: 200px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
             border: 2px solid gold;
+            flex-shrink: 0;
+            transition: transform 0.2s;
         }
 
+        .bingo-card:hover {
+            transform: translateY(-5px);
+        }
+
+        /* Card Header - Mini */
         .card-header {
             display: flex;
+            justify-content: space-between;
             align-items: center;
-            margin-bottom: 15px;
-            font-size: 1.2em;
-        }
-
-        .card-text {
-            color: #333;
-            font-weight: bold;
+            margin-bottom: 6px;
+            font-size: 0.8em;
         }
 
         .card-number {
             color: gold;
             font-weight: bold;
-            margin-left: 5px;
+            background: rgba(0,0,0,0.1);
+            padding: 2px 8px;
+            border-radius: 12px;
         }
 
+        .card-status {
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.7em;
+            font-weight: bold;
+        }
+
+        .card-status.active {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .card-status.disabled {
+            background: #f44336;
+            color: white;
+        }
+
+        /* BINGO Header - Mini */
         .bingo-header {
             display: grid;
             grid-template-columns: repeat(5, 1fr);
-            gap: 5px;
-            margin-bottom: 5px;
+            gap: 2px;
+            margin-bottom: 2px;
         }
 
         .bingo-letter {
             background: gold;
             color: black;
             text-align: center;
-            padding: 8px 0;
+            padding: 4px 0;
             font-weight: bold;
-            font-size: 1.2em;
-            border-radius: 5px;
+            font-size: 0.8em;
+            border-radius: 4px;
         }
 
+        /* 5x5 Grid - Mini */
         .gridCard {
             display: grid;
             grid-template-columns: repeat(5, 1fr);
-            gap: 5px;
+            gap: 2px;
         }
 
         .cell {
             background: #f8f8f8;
             color: #333;
-            padding: 10px 0;
-            border-radius: 5px;
+            padding: 6px 0;
+            border-radius: 4px;
             font-weight: bold;
-            font-size: 1em;
+            font-size: 0.7em;
             text-align: center;
             border: 1px solid #ddd;
         }
@@ -403,44 +350,148 @@
             color: black;
         }
 
-        /* Back Button */
-        .back-btn {
-            background: rgba(255,255,255,0.2);
-            color: white;
-            border: 2px solid gold;
-            padding: 12px 20px;
-            border-radius: 40px;
-            font-size: 1.1em;
+        /* Card Selection Grid */
+        #grid {
+            display: grid;
+            grid-template-columns: repeat(20, 1fr);
+            gap: 2px;
+            max-height: 150px;
+            overflow-y: auto;
+            padding: 8px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+            margin: 8px 0;
+        }
+
+        .box {
+            background: white;
+            color: black;
+            padding: 4px 0;
+            border-radius: 3px;
+            font-size: 0.6em;
+            text-align: center;
             cursor: pointer;
-            width: 100%;
-            margin: 15px 0;
+        }
+
+        .box.selected {
+            background: #4CAF50;
+            color: white;
+        }
+
+        /* Summary Bar */
+        .summary-bar {
+            display: flex;
+            justify-content: space-between;
+            background: rgba(0,0,0,0.3);
+            padding: 8px 12px;
+            border-radius: 20px;
+            margin: 8px 0;
+            font-size: 0.9em;
+        }
+
+        /* Buttons */
+        button {
+            padding: 8px 15px;
+            font-size: 0.9em;
+            border: none;
+            border-radius: 20px;
+            background: #4CAF50;
+            color: white;
+            cursor: pointer;
+            margin: 3px;
             font-weight: bold;
         }
 
-        .back-btn:hover {
-            background: gold;
-            color: black;
+        .cancel-btn {
+            background: #f44336;
+        }
+
+        .back-btn {
+            background: rgba(255,255,255,0.2);
+            border: 2px solid gold;
+            padding: 10px;
+            width: 100%;
+            font-size: 1em;
+        }
+
+        /* Game Timer */
+        .game-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .game-title {
+            font-size: 1em;
+        }
+
+        .game-info-text {
+            color: gold;
+            font-weight: bold;
+        }
+
+        .timer {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: gold;
+        }
+
+        /* NEW FEATURE - Quick Stats Bar */
+        .quick-stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 5px;
+            background: rgba(0,0,0,0.3);
+            padding: 8px;
+            border-radius: 10px;
+            margin: 8px 0;
+            text-align: center;
+            font-size: 0.8em;
+        }
+
+        .stat-box {
+            background: rgba(255,215,0,0.1);
+            padding: 5px;
+            border-radius: 8px;
+        }
+
+        .stat-box .value {
+            color: gold;
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+
+        /* NEW FEATURE - Sound Toggle */
+        .sound-toggle {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            margin: 5px 0;
+        }
+
+        .sound-btn {
+            background: rgba(255,255,255,0.2);
+            border: 1px solid gold;
+            padding: 5px 10px;
+            font-size: 0.8em;
         }
 
         /* Footer */
         .footer-info {
             text-align: center;
-            font-size: 0.8em;
-            color: rgba(255,255,255,0.8);
+            font-size: 0.7em;
+            color: rgba(255,255,255,0.7);
             margin-top: 10px;
         }
 
         /* Page visibility */
-        #selectPage {
+        #selectPage, #countdownPage, #gamePage {
+            display: none;
+        }
+
+        #selectPage.active, #countdownPage.active, #gamePage.active {
             display: block;
-        }
-
-        #gamePage {
-            display: none;
-        }
-
-        #countdownPage {
-            display: none;
         }
     </style>
 </head>
@@ -455,31 +506,20 @@
 
         <!-- Game Status -->
         <div class="game-info">
-            <div class="info-item">
-                <div>Cards Sold</div>
-                <div class="info-value" id="totalCardsSold">0</div>
-            </div>
-            <div class="info-item">
-                <div>Players</div>
-                <div class="info-value" id="totalPlayers">0</div>
-            </div>
-            <div class="info-item">
-                <div>Prize</div>
-                <div class="info-value" id="prizePool">0</div>
-            </div>
+            <div>Cards: <span class="info-value" id="totalCardsSold">0</span></div>
+            <div>Players: <span class="info-value" id="totalPlayers">0</span></div>
+            <div>Prize: <span class="info-value" id="prizePool">0</span></div>
         </div>
 
         <!-- SELECTION PAGE -->
-        <div id="selectPage">
-            <h3 style="text-align: center;">🎫 Select Cards (1-1000)</h3>
+        <div id="selectPage" class="active">
+            <h3 style="text-align: center; font-size: 1em;">🎫 Select Cards (1-1000)</h3>
             
             <!-- Range Selector -->
             <div style="display: flex; gap: 3px; flex-wrap: wrap; justify-content: center; margin: 5px 0;" id="rangeSelector"></div>
             
             <!-- Card Grid -->
-            <div class="grid-container">
-                <div id="grid"></div>
-            </div>
+            <div id="grid"></div>
 
             <div class="summary-bar">
                 <span>Your Cards: <span id="selectedCount">0</span></span>
@@ -488,68 +528,96 @@
 
             <div style="text-align: center;">
                 <button onclick="confirmCards()" id="confirmBtn">✅ BUY CARDS</button>
-                <button class="cancel-btn" onclick="cancelSelection()">❌ CLEAR ALL</button>
+                <button class="cancel-btn" onclick="cancelSelection()">❌ CLEAR</button>
             </div>
             
             <div class="footer-info">
-                * 10 cards minimum to start • 30s countdown
+                * 10 cards min • 30s countdown
             </div>
         </div>
 
         <!-- COUNTDOWN PAGE -->
         <div id="countdownPage">
-            <div style="text-align: center; padding: 40px;">
-                <h2 style="color: gold; font-size: 3em;" id="countdown">30</h2>
-                <p>Game starting in...</p>
+            <div style="text-align: center; padding: 30px;">
+                <h2 style="color: gold; font-size: 4em;" id="countdown">30</h2>
+                <p style="font-size: 1.2em;">Game starting in...</p>
+                <div style="margin-top: 20px; color: gold;" id="countdownInfo"></div>
             </div>
         </div>
 
-        <!-- GAME PAGE -->
+        <!-- GAME PAGE - CARDS SIDE BY SIDE -->
         <div id="gamePage">
-            <!-- Header -->
+            <!-- Header with timer -->
             <div class="game-header">
                 <div class="game-title">
-                    <span>GAME PAGE</span><br>
-                    <span class="game-info">Game: <span id="currentGameType">full house</span> | Prize: <span id="currentPrize">2000</span> ETB</span>
+                    <span>🎯 GAME</span><br>
+                    <span class="game-info-text"><span id="currentGameType">full house</span> | <span id="currentPrize">2000</span> ETB</span>
                 </div>
                 <div class="timer" id="gameTimer">00:00</div>
             </div>
 
+            <!-- NEW FEATURE: Quick Stats Bar -->
+            <div class="quick-stats">
+                <div class="stat-box">
+                    <div class="value" id="activeCardsCount">0</div>
+                    <div>Active</div>
+                </div>
+                <div class="stat-box">
+                    <div class="value" id="calledCount">0</div>
+                    <div>Called</div>
+                </div>
+                <div class="stat-box">
+                    <div class="value" id="remainingCount">75</div>
+                    <div>Remaining</div>
+                </div>
+                <div class="stat-box">
+                    <div class="value" id="winChance">0%</div>
+                    <div>Chance</div>
+                </div>
+            </div>
+
             <!-- Mode Toggle -->
-            <div class="mode-section">
-                <div class="mode-row">
-                    <span class="mode-option mode-manual">MANUAL MARK</span>
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="markModeToggle" checked onchange="toggleMarkMode()">
-                        <span class="slider"></span>
-                    </label>
-                    <span class="mode-option mode-auto">AUTO MARK</span>
-                </div>
-                <div class="mode-status" id="modeStatus">
-                    Auto-Mark is ON - Numbers will mark automatically
-                </div>
+            <div class="mode-container">
+                <span class="mode-label mode-manual">✋ MANUAL</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="markModeToggle" checked onchange="toggleMarkMode()">
+                    <span class="slider"></span>
+                </label>
+                <span class="mode-label mode-auto">🔄 AUTO</span>
+            </div>
+            <div class="mode-status" id="modeStatus">
+                Auto-Mark is ON
+            </div>
+
+            <!-- NEW FEATURE: Sound Toggle -->
+            <div class="sound-toggle">
+                <button class="sound-btn" onclick="toggleSound()" id="soundBtn">🔊 Sound ON</button>
+                <span style="flex:1; text-align:right; font-size:0.8em;">⚡ Last: <span id="lastNumber">-</span></span>
             </div>
 
             <!-- Called Numbers -->
             <div class="called-section">
-                <div class="called-title">CALLED NUMBERS:</div>
+                <div class="called-title">📢 CALLED NUMBERS:</div>
                 <div class="called-numbers" id="numbersList"></div>
             </div>
 
             <!-- BINGO Button -->
             <div class="bingo-btn-container">
-                <button class="bingo-btn" onclick="callBingo()" id="bingoBtn" disabled>BINGO!</button>
+                <button class="bingo-btn" onclick="callBingo()" id="bingoBtn" disabled>🔴 BINGO!</button>
             </div>
 
-            <!-- Game Cards -->
+            <!-- CARDS SIDE BY SIDE - HORIZONTAL SCROLL -->
             <div class="cards-container" id="gameCards"></div>
 
             <!-- Back Button -->
-            <button class="back-btn" onclick="backToSelection()">BACK TO CARD SELECTION</button>
+            <button class="back-btn" onclick="backToSelection()">🔙 BACK TO SELECTION</button>
+
+            <!-- Winners Display -->
+            <div id="winnersDisplay" style="display: none; margin-top: 10px; padding: 8px; background: rgba(255,215,0,0.2); border-radius: 8px;"></div>
 
             <!-- Footer -->
             <div class="footer-info">
-                AUTO-MARK is ON by default | Winner cards glow for ALL players | Click BINGO when you win!
+                ⚡ Cards side by side • AUTO-MARK default • Click BINGO when you win!
             </div>
         </div>
     </div>
@@ -578,6 +646,10 @@
         let manuallyMarked = {};
         let disabledCards = new Set();
         
+        // Sound (simulated)
+        let soundEnabled = true;
+        
+        // Timers
         let gameTimer = null;
         let callInterval = null;
         let countdownInterval = null;
@@ -592,7 +664,15 @@
             createRangeSelector();
             updateSummary();
             loadGameSettings();
+            showPage('select');
         };
+
+        function showPage(page) {
+            document.getElementById('selectPage').classList.remove('active');
+            document.getElementById('countdownPage').classList.remove('active');
+            document.getElementById('gamePage').classList.remove('active');
+            document.getElementById(page + 'Page').classList.add('active');
+        }
 
         // ==================== LOAD GAME SETTINGS ====================
         async function loadGameSettings() {
@@ -623,11 +703,11 @@
             
             ranges.forEach(range => {
                 let btn = document.createElement("button");
-                btn.style.padding = '5px 10px';
-                btn.style.fontSize = '0.8em';
+                btn.style.padding = '5px 8px';
+                btn.style.fontSize = '0.7em';
                 btn.style.background = 'rgba(255,215,0,0.2)';
                 btn.style.border = '1px solid gold';
-                btn.style.borderRadius = '15px';
+                btn.style.borderRadius = '12px';
                 btn.style.color = 'white';
                 btn.style.cursor = 'pointer';
                 btn.innerText = `${range.start}-${range.end}`;
@@ -677,40 +757,12 @@
             let card = new Array(25).fill(0);
             let seed = cardNumber || Math.floor(Math.random() * 1000);
             
-            // B column (1-15)
-            let bCol = [];
-            while (bCol.length < 5) {
-                let n = ((seed * 1 + bCol.length * 7) % 15) + 1;
-                if (!bCol.includes(n)) bCol.push(n);
-            }
-            
-            // I column (16-30)
-            let iCol = [];
-            while (iCol.length < 5) {
-                let n = ((seed * 2 + iCol.length * 7) % 15) + 16;
-                if (!iCol.includes(n)) iCol.push(n);
-            }
-            
-            // N column (31-45)
-            let nCol = [];
-            while (nCol.length < 5) {
-                let n = ((seed * 3 + nCol.length * 7) % 15) + 31;
-                if (!nCol.includes(n)) nCol.push(n);
-            }
-            
-            // G column (46-60)
-            let gCol = [];
-            while (gCol.length < 5) {
-                let n = ((seed * 4 + gCol.length * 7) % 15) + 46;
-                if (!gCol.includes(n)) gCol.push(n);
-            }
-            
-            // O column (61-75)
-            let oCol = [];
-            while (oCol.length < 5) {
-                let n = ((seed * 5 + oCol.length * 7) % 15) + 61;
-                if (!oCol.includes(n)) oCol.push(n);
-            }
+            // Generate columns
+            let bCol = []; while (bCol.length < 5) { let n = ((seed * 1 + bCol.length * 7) % 15) + 1; if (!bCol.includes(n)) bCol.push(n); }
+            let iCol = []; while (iCol.length < 5) { let n = ((seed * 2 + iCol.length * 7) % 15) + 16; if (!iCol.includes(n)) iCol.push(n); }
+            let nCol = []; while (nCol.length < 5) { let n = ((seed * 3 + nCol.length * 7) % 15) + 31; if (!nCol.includes(n)) nCol.push(n); }
+            let gCol = []; while (gCol.length < 5) { let n = ((seed * 4 + gCol.length * 7) % 15) + 46; if (!gCol.includes(n)) gCol.push(n); }
+            let oCol = []; while (oCol.length < 5) { let n = ((seed * 5 + oCol.length * 7) % 15) + 61; if (!oCol.includes(n)) oCol.push(n); }
             
             // Fill card row by row
             for (let row = 0; row < 5; row++) {
@@ -720,7 +772,7 @@
                 card[row * 5 + 3] = gCol[row];
                 card[row * 5 + 4] = oCol[row];
             }
-            card[12] = "FREE"; // Center cell
+            card[12] = "FREE";
             return card;
         }
 
@@ -730,12 +782,18 @@
             let status = document.getElementById('modeStatus');
             
             if (autoMarkEnabled) {
-                status.innerHTML = 'Auto-Mark is ON - Numbers will mark automatically';
+                status.innerHTML = '🔄 Auto-Mark is ON';
                 status.style.background = 'rgba(76, 175, 80, 0.3)';
             } else {
-                status.innerHTML = 'Manual-Mark is ON - Click cells to mark numbers';
+                status.innerHTML = '✋ Manual-Mark is ON - Click cells';
                 status.style.background = 'rgba(255, 152, 0, 0.3)';
             }
+        }
+
+        // ==================== TOGGLE SOUND ====================
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            document.getElementById('soundBtn').innerText = soundEnabled ? '🔊 Sound ON' : '🔇 Sound OFF';
         }
 
         // ==================== IS NUMBER MARKED ====================
@@ -752,6 +810,23 @@
             let total = count * gameSettings.cardPrice;
             document.getElementById("selectedCount").innerText = count;
             document.getElementById("totalPrice").innerText = total;
+        }
+
+        // ==================== UPDATE QUICK STATS ====================
+        function updateQuickStats() {
+            let active = 0;
+            for (let cardNum in currentGameCards) {
+                if (!disabledCards.has(parseInt(cardNum))) active++;
+            }
+            document.getElementById('activeCardsCount').innerText = active;
+            document.getElementById('calledCount').innerText = gameSettings.calledNumbers.length;
+            document.getElementById('remainingCount').innerText = 75 - gameSettings.calledNumbers.length;
+            
+            // Simple win chance calculation
+            if (active > 0 && gameSettings.calledNumbers.length > 0) {
+                let chance = Math.min(95, Math.floor((gameSettings.calledNumbers.length / 75) * 100));
+                document.getElementById('winChance').innerText = chance + '%';
+            }
         }
 
         // ==================== CONFIRM CARDS ====================
@@ -807,11 +882,11 @@
 
         // ==================== COUNTDOWN ====================
         function showCountdown() {
-            document.getElementById("selectPage").style.display = "none";
-            document.getElementById("countdownPage").style.display = "block";
+            showPage('countdown');
             
             let countdown = 30;
             document.getElementById('countdown').innerText = countdown;
+            document.getElementById('countdownInfo').innerHTML = `🎮 ${Object.keys(currentGameCards).length} cards ready!`;
             
             countdownInterval = setInterval(() => {
                 countdown--;
@@ -826,8 +901,7 @@
 
         // ==================== START GAME ====================
         function startGame() {
-            document.getElementById("countdownPage").style.display = "none";
-            document.getElementById("gamePage").style.display = "block";
+            showPage('game');
             
             gameStarted = true;
             gameSettings.isGameActive = true;
@@ -839,14 +913,18 @@
             startTimer();
             showGameCards();
             startNumberCalls();
+            updateQuickStats();
         }
 
-        // ==================== SHOW GAME CARDS ====================
+        // ==================== SHOW GAME CARDS SIDE BY SIDE ====================
         function showGameCards() {
             let container = document.getElementById("gameCards");
             container.innerHTML = "";
             
-            for (let cardNum in currentGameCards) {
+            // Sort cards by number
+            let sortedCards = Object.keys(currentGameCards).sort((a,b) => parseInt(a) - parseInt(b));
+            
+            for (let cardNum of sortedCards) {
                 let cardData = currentGameCards[cardNum];
                 let isDisabled = disabledCards.has(parseInt(cardNum));
                 
@@ -857,16 +935,16 @@
                 let header = document.createElement("div");
                 header.className = "card-header";
                 
-                let text = document.createElement("span");
-                text.className = "card-text";
-                text.innerText = "Card";
-                
                 let number = document.createElement("span");
                 number.className = "card-number";
                 number.innerText = `#${cardNum}`;
                 
-                header.appendChild(text);
+                let status = document.createElement("span");
+                status.className = `card-status ${isDisabled ? 'disabled' : 'active'}`;
+                status.innerText = isDisabled ? '❌' : '✓';
+                
                 header.appendChild(number);
+                header.appendChild(status);
                 div.appendChild(header);
 
                 // BINGO Header
@@ -915,6 +993,8 @@
                 div.appendChild(grid);
                 container.appendChild(div);
             }
+            
+            updateQuickStats();
         }
 
         // ==================== CHECK FOR WIN ====================
@@ -946,6 +1026,14 @@
                 gameSettings.winners = gameSettings.winners.concat(winners);
                 let prizePerWinner = gameSettings.prizeAmount / gameSettings.winners.length;
                 
+                // Show winners
+                let winnersDiv = document.getElementById("winnersDisplay");
+                winnersDiv.style.display = "block";
+                winnersDiv.innerHTML = `<h4 style="color:gold;">🏆 WINNER!</h4>`;
+                gameSettings.winners.forEach(w => {
+                    winnersDiv.innerHTML += `<div>Card #${w.cardNumber} - ${prizePerWinner} ETB</div>`;
+                });
+                
                 alert(`🎉 BINGO! You win ${prizePerWinner} ETB!`);
                 
                 document.getElementById('bingoBtn').disabled = true;
@@ -955,9 +1043,6 @@
                 
                 playerBalance += prizePerWinner;
                 document.getElementById("playerBalance").innerText = playerBalance;
-                
-                // Show winners
-                // In real app, this would be more sophisticated
                 
             } else {
                 // False BINGO - disable one card
@@ -980,9 +1065,7 @@
             if (gameTimer) clearInterval(gameTimer);
             if (callInterval) clearInterval(callInterval);
             
-            document.getElementById("selectPage").style.display = "block";
-            document.getElementById("countdownPage").style.display = "none";
-            document.getElementById("gamePage").style.display = "none";
+            showPage('select');
             
             gameStarted = false;
             gameSettings.isGameActive = false;
@@ -991,6 +1074,7 @@
             disabledCards.clear();
             manuallyMarked = {};
             document.getElementById('numbersList').innerHTML = '';
+            document.getElementById('winnersDisplay').style.display = 'none';
         }
 
         // ==================== START NUMBER CALLS ====================
@@ -1002,13 +1086,24 @@
                 if (!gameSettings.calledNumbers.includes(num)) {
                     gameSettings.calledNumbers.push(num);
                     
+                    // Add to display
                     let list = document.getElementById('numbersList');
                     let ball = document.createElement('span');
                     ball.className = 'number-ball';
                     ball.innerText = num;
                     list.appendChild(ball);
                     
+                    // Update last number
+                    document.getElementById('lastNumber').innerText = num;
+                    
+                    // Simulate sound
+                    if (soundEnabled) {
+                        // Can't actually play sound in browser without user interaction
+                        console.log('Beep!', num);
+                    }
+                    
                     showGameCards();
+                    updateQuickStats();
                     
                     document.getElementById('bingoBtn').disabled = false;
                     bingoButtonEnabled = true;
