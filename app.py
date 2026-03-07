@@ -55,10 +55,6 @@ def init_db():
                   is_admin BOOLEAN DEFAULT 0,
                   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     
-    # Make the admin user an admin
-    if ADMIN_ID:
-        c.execute("UPDATE users SET is_admin = 1 WHERE telegram_id = ?", (ADMIN_ID,))
-    
     # Transactions table
     c.execute('''CREATE TABLE IF NOT EXISTS transactions
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -134,6 +130,46 @@ def init_db():
     logger.info("Database initialized successfully")
 
 init_db()
+
+# ==================== FIX: ENSURE ADMIN USER IS SET ====================
+def ensure_admin_user():
+    """Make sure the ADMIN_ID user is set as admin in database"""
+    if not ADMIN_ID or ADMIN_ID == 0:
+        logger.warning("No ADMIN_ID set in environment variables")
+        return
+    
+    conn = sqlite3.connect('database/bingo.db')
+    c = conn.cursor()
+    
+    # Check if user exists
+    c.execute("SELECT id, is_admin FROM users WHERE telegram_id = ?", (ADMIN_ID,))
+    user = c.fetchone()
+    
+    if user:
+        # User exists, make sure they are admin
+        if user[1] != 1:
+            c.execute("UPDATE users SET is_admin = 1 WHERE telegram_id = ?", (ADMIN_ID,))
+            logger.info(f"User {ADMIN_ID} updated to admin")
+        else:
+            logger.info(f"User {ADMIN_ID} is already admin")
+    else:
+        # User doesn't exist, create them as admin
+        c.execute('''INSERT INTO users 
+                     (telegram_id, username, first_name, is_admin) 
+                     VALUES (?, ?, ?, 1)''',
+                  (ADMIN_ID, "admin", "Admin"))
+        logger.info(f"Admin user {ADMIN_ID} created")
+    
+    # Verify admin count
+    c.execute("SELECT COUNT(*) FROM users WHERE is_admin = 1")
+    admin_count = c.fetchone()[0]
+    logger.info(f"Total admins in database: {admin_count}")
+    
+    conn.commit()
+    conn.close()
+
+# Call this after database initialization
+ensure_admin_user()
 
 # ==================== DATABASE HELPER FUNCTIONS ====================
 def get_user(telegram_id):
@@ -321,6 +357,10 @@ def get_game_stats():
     c.execute("SELECT COUNT(*) FROM game_sessions WHERE status = 'active'")
     active_games = c.fetchone()[0]
     
+    # Pending transactions count
+    c.execute("SELECT COUNT(*) FROM transactions WHERE status = 'pending'")
+    pending_count = c.fetchone()[0]
+    
     conn.close()
     
     return {
@@ -328,7 +368,8 @@ def get_game_stats():
         'total_transactions': tx_count,
         'total_deposits': tx_total,
         'total_games': total_games,
-        'active_games': active_games
+        'active_games': active_games,
+        'pending_count': pending_count
     }
 
 def log_admin_action(admin_id, action, details):
@@ -412,18 +453,10 @@ def run_bot_process():
         conn.commit()
         conn.close()
     
-    def bot_get_game_settings():
-        conn = sqlite3.connect('database/bingo.db')
-        c = conn.cursor()
-        c.execute("SELECT game_type, card_price, prize_pool, min_cards_to_start FROM game_settings ORDER BY updated_at DESC LIMIT 1")
-        settings = c.fetchone()
-        conn.close()
-        return settings
-    
     # ==================== BOT HANDLERS ====================
     async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user = update.effective_user
-        logger.info(f"Start from {user.first_name}")
+        logger.info(f"Start from {user.first_name} (ID: {user.id})")
         
         # Get or create user
         db_user = bot_get_user(user.id)
@@ -431,15 +464,16 @@ def run_bot_process():
             bot_create_user(user.id, user.username, user.first_name)
             db_user = bot_get_user(user.id)
             
-            # If still None, something went wrong
             if not db_user:
                 await update.message.reply_text("❌ Error creating user. Please try again.")
                 return
         
-        # Check if admin - safely access tuple
+        # IMPORTANT: Check if user is admin
         is_admin = False
-        if db_user and len(db_user) > 9:
+        if db_user and len(db_user) > 9:  # is_admin is at index 9
             is_admin = db_user[9] == 1
+            if is_admin:
+                logger.info(f"✅ User {user.id} is an ADMIN")
         
         # Check if phone number exists
         phone_number = db_user[8] if db_user and len(db_user) > 8 else None
@@ -457,7 +491,7 @@ def run_bot_process():
             )
             return
         
-        # Main menu buttons
+        # Create main menu buttons
         keyboard = [
             [InlineKeyboardButton("🎮 PLAY BINGO", web_app={"url": f"{APP_URL}/game?user={user.id}"})],
             [
@@ -467,8 +501,9 @@ def run_bot_process():
             [InlineKeyboardButton("💳 BALANCE", callback_data="balance")]
         ]
         
-        # Add admin button if user is admin
+        # ADD ADMIN BUTTON IF USER IS ADMIN
         if is_admin:
+            logger.info(f"👑 Adding admin button for user {user.id}")
             keyboard.append([InlineKeyboardButton("👑 ADMIN PANEL", web_app={"url": f"{APP_URL}/admin?user={user.id}"})])
         
         balance = db_user[4] if db_user and len(db_user) > 4 else 1000
@@ -487,16 +522,17 @@ def run_bot_process():
             bot_update_phone(user.id, contact.phone_number)
             await update.message.reply_text(f"✅ Phone number saved!")
             
-            # Show main menu
+            # Get updated user
             db_user = bot_get_user(user.id)
             
-            # Safely check admin
+            # Check if admin
             is_admin = False
             if db_user and len(db_user) > 9:
                 is_admin = db_user[9] == 1
             
             balance = db_user[4] if db_user and len(db_user) > 4 else 1000
             
+            # Create main menu
             keyboard = [
                 [InlineKeyboardButton("🎮 PLAY BINGO", web_app={"url": f"{APP_URL}/game?user={user.id}"})],
                 [
@@ -506,6 +542,7 @@ def run_bot_process():
                 [InlineKeyboardButton("💳 BALANCE", callback_data="balance")]
             ]
             
+            # ADD ADMIN BUTTON IF USER IS ADMIN
             if is_admin:
                 keyboard.append([InlineKeyboardButton("👑 ADMIN PANEL", web_app={"url": f"{APP_URL}/admin?user={user.id}"})])
             
@@ -815,12 +852,16 @@ def admin_panel():
     """Admin panel page"""
     user_id = request.args.get('user')
     if not user_id:
-        return "Unauthorized", 401
+        return "Unauthorized - No user ID", 401
     
     user = get_user(int(user_id))
-    if not user or not user['is_admin']:
-        return "Unauthorized", 401
+    if not user:
+        return f"Unauthorized - User {user_id} not found", 401
     
+    if not user['is_admin']:
+        return f"Unauthorized - User {user_id} is not admin", 401
+    
+    logger.info(f"Admin panel accessed by user {user_id}")
     return render_template('admin.html', admin_id=user_id, admin_name=user['first_name'])
 
 @application.route('/api/admin/check/<int:telegram_id>')
@@ -1070,6 +1111,7 @@ def health():
         'bot_process': bot_process.is_alive() if bot_process else False,
         'is_main_process': IS_MAIN_PROCESS,
         'admin_id': ADMIN_ID,
+        'admin_configured': ADMIN_ID != 0,
         'url': APP_URL
     })
 
