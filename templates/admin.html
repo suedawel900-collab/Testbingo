@@ -1,0 +1,1148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MK BINGO - Admin Panel</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            min-height: 100vh;
+            color: white;
+            padding: 15px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .header {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 2px solid gold;
+        }
+
+        .header h1 {
+            color: gold;
+            font-size: 2em;
+            text-shadow: 0 0 10px gold;
+        }
+
+        .admin-info {
+            background: rgba(0,0,0,0.3);
+            padding: 10px 20px;
+            border-radius: 30px;
+            border: 1px solid gold;
+        }
+
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 15px;
+            border: 1px solid gold;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2em;
+            color: gold;
+            font-weight: bold;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            color: rgba(255,255,255,0.8);
+            margin-top: 5px;
+        }
+
+        /* Main Grid */
+        .admin-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .admin-card {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            border: 2px solid gold;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid gold;
+        }
+
+        .card-header h2 {
+            color: gold;
+            font-size: 1.3em;
+        }
+
+        .card-header .badge {
+            background: gold;
+            color: black;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: bold;
+        }
+
+        /* Settings Form */
+        .settings-form {
+            display: grid;
+            gap: 15px;
+        }
+
+        .form-group {
+            display: grid;
+            gap: 5px;
+        }
+
+        .form-group label {
+            font-size: 0.9em;
+            color: gold;
+        }
+
+        .form-group input, .form-group select {
+            padding: 10px;
+            border-radius: 10px;
+            border: 2px solid gold;
+            background: rgba(0,0,0,0.3);
+            color: white;
+            font-size: 1em;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #ffd700;
+            box-shadow: 0 0 10px gold;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        /* Tables */
+        .table-container {
+            overflow-x: auto;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            background: gold;
+            color: black;
+            padding: 10px;
+            font-weight: bold;
+            position: sticky;
+            top: 0;
+        }
+
+        td {
+            padding: 10px;
+            border-bottom: 1px solid rgba(255,215,0,0.3);
+            text-align: center;
+        }
+
+        tr:hover {
+            background: rgba(255,215,0,0.1);
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+            margin: 2px;
+        }
+
+        .btn-primary {
+            background: gold;
+            color: black;
+        }
+
+        .btn-success {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #f44336;
+            color: white;
+        }
+
+        .btn-warning {
+            background: #ff9800;
+            color: black;
+        }
+
+        .btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px currentColor;
+        }
+
+        .btn-sm {
+            padding: 5px 10px;
+            font-size: 0.8em;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            background: rgba(255,255,255,0.1);
+            border: 2px solid gold;
+            border-radius: 30px;
+            cursor: pointer;
+            color: white;
+            font-weight: bold;
+        }
+
+        .tab.active {
+            background: gold;
+            color: black;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Status Badges */
+        .status-badge {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: bold;
+        }
+
+        .status-pending {
+            background: #ff9800;
+            color: black;
+        }
+
+        .status-approved {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .status-rejected {
+            background: #f44336;
+            color: white;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: #16213e;
+            padding: 30px;
+            border-radius: 20px;
+            border: 3px solid gold;
+            max-width: 500px;
+            width: 90%;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-header h3 {
+            color: gold;
+        }
+
+        .close {
+            font-size: 2em;
+            cursor: pointer;
+            color: gold;
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: gold;
+        }
+
+        .loading::after {
+            content: '';
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid gold;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 10px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Logs */
+        .log-entry {
+            padding: 10px;
+            border-bottom: 1px solid rgba(255,215,0,0.3);
+            font-size: 0.9em;
+        }
+
+        .log-time {
+            color: gold;
+            font-weight: bold;
+        }
+
+        .log-admin {
+            color: #4CAF50;
+        }
+
+        .log-action {
+            color: #ff9800;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .admin-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .header {
+                flex-direction: column;
+                gap: 10px;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>👑 MK BINGO ADMIN PANEL</h1>
+            <div class="admin-info">
+                <span id="adminName">Loading...</span> | 
+                <span id="adminId"></span>
+            </div>
+        </div>
+
+        <!-- Stats Cards -->
+        <div class="stats-grid" id="statsContainer">
+            <div class="stat-card">
+                <div class="stat-value" id="totalUsers">0</div>
+                <div class="stat-label">Total Users</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="totalDeposits">0</div>
+                <div class="stat-label">Total Deposits (ETB)</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="pendingTransactions">0</div>
+                <div class="stat-label">Pending Transactions</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="totalGames">0</div>
+                <div class="stat-label">Games Played</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="activeGames">0</div>
+                <div class="stat-label">Active Games</div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('dashboard')">📊 Dashboard</div>
+            <div class="tab" onclick="switchTab('transactions')">💰 Transactions</div>
+            <div class="tab" onclick="switchTab('users')">👥 Users</div>
+            <div class="tab" onclick="switchTab('settings')">⚙️ Settings</div>
+            <div class="tab" onclick="switchTab('games')">🎮 Games</div>
+            <div class="tab" onclick="switchTab('logs')">📋 Logs</div>
+        </div>
+
+        <!-- Dashboard Tab -->
+        <div id="dashboard" class="tab-content active">
+            <div class="admin-grid">
+                <!-- Quick Actions -->
+                <div class="admin-card">
+                    <div class="card-header">
+                        <h2>⚡ Quick Actions</h2>
+                        <span class="badge">Admin</span>
+                    </div>
+                    <div style="display: grid; gap: 10px;">
+                        <button class="btn btn-primary" onclick="refreshAll()">🔄 Refresh All Data</button>
+                        <button class="btn btn-success" onclick="startNewGame()">🎮 Start New Game</button>
+                        <button class="btn btn-warning" onclick="showBroadcastModal()">📢 Broadcast Message</button>
+                    </div>
+                </div>
+
+                <!-- Current Settings -->
+                <div class="admin-card">
+                    <div class="card-header">
+                        <h2>⚙️ Current Settings</h2>
+                    </div>
+                    <div style="display: grid; gap: 10px;" id="currentSettings">
+                        <div>Game Type: <span id="currentGameType">full house</span></div>
+                        <div>Card Price: <span id="currentCardPrice">10</span> ETB</div>
+                        <div>Prize Pool: <span id="currentPrizePool">2000</span> ETB</div>
+                        <div>Min Cards: <span id="currentMinCards">10</span></div>
+                        <div>Call Interval: <span id="currentCallInterval">3</span> seconds</div>
+                    </div>
+                </div>
+
+                <!-- Recent Activity -->
+                <div class="admin-card">
+                    <div class="card-header">
+                        <h2>📈 Recent Activity</h2>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Action</th>
+                                    <th>Details</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recentActivity">
+                                <tr><td colspan="3">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Transactions Tab -->
+        <div id="transactions" class="tab-content">
+            <div class="admin-card">
+                <div class="card-header">
+                    <h2>💰 Pending Transactions</h2>
+                    <span class="badge" id="pendingCount">0</span>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>User</th>
+                                <th>Amount</th>
+                                <th>TX ID</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="transactionsList">
+                            <tr><td colspan="5">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Users Tab -->
+        <div id="users" class="tab-content">
+            <div class="admin-card">
+                <div class="card-header">
+                    <h2>👥 User Management</h2>
+                    <input type="text" placeholder="Search users..." id="userSearch" onkeyup="searchUsers()" style="padding: 5px; border-radius: 5px;">
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Username</th>
+                                <th>Name</th>
+                                <th>Balance</th>
+                                <th>Games</th>
+                                <th>Wins</th>
+                                <th>Deposits</th>
+                                <th>Phone</th>
+                                <th>Admin</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="usersList">
+                            <tr><td colspan="10">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Tab -->
+        <div id="settings" class="tab-content">
+            <div class="admin-grid">
+                <div class="admin-card">
+                    <div class="card-header">
+                        <h2>⚙️ Game Settings</h2>
+                    </div>
+                    <div class="settings-form">
+                        <div class="form-group">
+                            <label>Game Type</label>
+                            <select id="gameType">
+                                <option value="full house">Full House</option>
+                                <option value="1 row">1 Row</option>
+                                <option value="1 column">1 Column</option>
+                                <option value="4 corners">4 Corners</option>
+                                <option value="X shape">X Shape</option>
+                                <option value="random">Random</option>
+                            </select>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Card Price (ETB)</label>
+                                <input type="number" id="cardPrice" min="1" value="10">
+                            </div>
+                            <div class="form-group">
+                                <label>Prize Pool (ETB)</label>
+                                <input type="number" id="prizePool" min="100" value="2000">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Min Cards to Start</label>
+                                <input type="number" id="minCards" min="1" value="10">
+                            </div>
+                            <div class="form-group">
+                                <label>Call Interval (sec)</label>
+                                <input type="number" id="callInterval" min="1" max="10" value="3">
+                            </div>
+                        </div>
+                        <button class="btn btn-primary" onclick="saveSettings()">💾 Save Settings</button>
+                    </div>
+                </div>
+
+                <div class="admin-card">
+                    <div class="card-header">
+                        <h2>📊 Game Statistics</h2>
+                    </div>
+                    <div style="display: grid; gap: 15px;" id="gameStats">
+                        <div>Total Revenue: <span id="totalRevenue">0</span> ETB</div>
+                        <div>Average Bet: <span id="avgBet">0</span> ETB</div>
+                        <div>Win Rate: <span id="winRate">0</span>%</div>
+                        <div>Most Active User: <span id="mostActive">-</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Games Tab -->
+        <div id="games" class="tab-content">
+            <div class="admin-grid">
+                <div class="admin-card">
+                    <div class="card-header">
+                        <h2>🎮 Active Games</h2>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Session</th>
+                                    <th>Type</th>
+                                    <th>Cards Sold</th>
+                                    <th>Players</th>
+                                    <th>Prize</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="gamesList">
+                                <tr><td colspan="7">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="admin-card">
+                    <div class="card-header">
+                        <h2>🏆 Declare Winner</h2>
+                    </div>
+                    <div class="settings-form">
+                        <div class="form-group">
+                            <label>Session ID</label>
+                            <input type="text" id="winnerSession" placeholder="Enter session ID">
+                        </div>
+                        <div class="form-group">
+                            <label>Winner User ID</label>
+                            <input type="text" id="winnerUserId" placeholder="Enter user ID">
+                        </div>
+                        <div class="form-group">
+                            <label>Winning Card</label>
+                            <input type="text" id="winningCard" placeholder="Card numbers">
+                        </div>
+                        <button class="btn btn-success" onclick="declareWinner()">🏆 Declare Winner</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Logs Tab -->
+        <div id="logs" class="tab-content">
+            <div class="admin-card">
+                <div class="card-header">
+                    <h2>📋 Admin Action Logs</h2>
+                </div>
+                <div class="table-container">
+                    <div id="logsList"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Balance Edit Modal -->
+    <div id="balanceModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>💰 Edit User Balance</h3>
+                <span class="close" onclick="closeModal('balanceModal')">&times;</span>
+            </div>
+            <div class="settings-form">
+                <div class="form-group">
+                    <label>User</label>
+                    <input type="text" id="editUser" readonly>
+                </div>
+                <div class="form-group">
+                    <label>Current Balance</label>
+                    <input type="text" id="currentBalance" readonly>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Amount</label>
+                        <input type="number" id="editAmount" placeholder="Enter amount">
+                    </div>
+                    <div class="form-group">
+                        <label>Operation</label>
+                        <select id="editOperation">
+                            <option value="add">Add</option>
+                            <option value="subtract">Subtract</option>
+                        </select>
+                    </div>
+                </div>
+                <button class="btn btn-primary" onclick="updateBalance()">Update Balance</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Broadcast Modal -->
+    <div id="broadcastModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>📢 Broadcast Message</h3>
+                <span class="close" onclick="closeModal('broadcastModal')">&times;</span>
+            </div>
+            <div class="settings-form">
+                <div class="form-group">
+                    <label>Message</label>
+                    <textarea id="broadcastMessage" rows="4" placeholder="Enter message to send to all users..."></textarea>
+                </div>
+                <button class="btn btn-primary" onclick="sendBroadcast()">Send Broadcast</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== GLOBAL VARIABLES ====================
+        const urlParams = new URLSearchParams(window.location.search);
+        const adminId = urlParams.get('user');
+        const API_URL = window.location.origin;
+        
+        let currentSettings = {};
+        let allUsers = [];
+        let pendingTransactions = [];
+
+        // ==================== INITIALIZATION ====================
+        window.onload = function() {
+            checkAdmin();
+            loadStats();
+            loadSettings();
+            loadTransactions();
+            loadUsers();
+            loadLogs();
+            
+            // Refresh every 30 seconds
+            setInterval(() => {
+                loadStats();
+                loadTransactions();
+            }, 30000);
+        };
+
+        // ==================== ADMIN CHECK ====================
+        async function checkAdmin() {
+            if (!adminId) {
+                window.location.href = '/';
+                return;
+            }
+            
+            try {
+                let response = await fetch(`${API_URL}/api/admin/check/${adminId}`);
+                let data = await response.json();
+                
+                if (!data.success || !data.is_admin) {
+                    window.location.href = '/';
+                    return;
+                }
+                
+                document.getElementById('adminId').innerText = adminId;
+                
+                // Load admin name
+                let userResponse = await fetch(`${API_URL}/api/user/${adminId}`);
+                let userData = await userResponse.json();
+                if (userData.success) {
+                    document.getElementById('adminName').innerText = userData.username || 'Admin';
+                }
+                
+            } catch (error) {
+                console.error('Admin check failed:', error);
+            }
+        }
+
+        // ==================== TAB SWITCHING ====================
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById(tabName).classList.add('active');
+        }
+
+        // ==================== LOAD STATS ====================
+        async function loadStats() {
+            try {
+                let response = await fetch(`${API_URL}/api/admin/stats?admin_id=${adminId}`);
+                let data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('totalUsers').innerText = data.stats.total_users;
+                    document.getElementById('totalDeposits').innerText = data.stats.total_deposits;
+                    document.getElementById('totalGames').innerText = data.stats.total_games;
+                    document.getElementById('activeGames').innerText = data.stats.active_games;
+                }
+            } catch (error) {
+                console.error('Failed to load stats:', error);
+            }
+        }
+
+        // ==================== LOAD SETTINGS ====================
+        async function loadSettings() {
+            try {
+                let response = await fetch(`${API_URL}/api/admin/stats?admin_id=${adminId}`);
+                let data = await response.json();
+                
+                if (data.success) {
+                    currentSettings = data.settings;
+                    
+                    document.getElementById('currentGameType').innerText = data.settings.game_type;
+                    document.getElementById('currentCardPrice').innerText = data.settings.card_price;
+                    document.getElementById('currentPrizePool').innerText = data.settings.prize_pool;
+                    document.getElementById('currentMinCards').innerText = data.settings.min_cards_to_start;
+                    document.getElementById('currentCallInterval').innerText = data.settings.call_interval;
+                    
+                    document.getElementById('gameType').value = data.settings.game_type;
+                    document.getElementById('cardPrice').value = data.settings.card_price;
+                    document.getElementById('prizePool').value = data.settings.prize_pool;
+                    document.getElementById('minCards').value = data.settings.min_cards_to_start;
+                    document.getElementById('callInterval').value = data.settings.call_interval;
+                }
+            } catch (error) {
+                console.error('Failed to load settings:', error);
+            }
+        }
+
+        // ==================== LOAD TRANSACTIONS ====================
+        async function loadTransactions() {
+            try {
+                let response = await fetch(`${API_URL}/api/admin/transactions?admin_id=${adminId}`);
+                let data = await response.json();
+                
+                if (data.success) {
+                    pendingTransactions = data.transactions;
+                    document.getElementById('pendingCount').innerText = data.transactions.length;
+                    
+                    let tbody = document.getElementById('transactionsList');
+                    tbody.innerHTML = '';
+                    
+                    if (data.transactions.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="5">No pending transactions</td></tr>';
+                        return;
+                    }
+                    
+                    data.transactions.forEach(tx => {
+                        let row = tbody.insertRow();
+                        row.innerHTML = `
+                            <td>${new Date(tx.created_at).toLocaleString()}</td>
+                            <td>@${tx.username || tx.name}</td>
+                            <td>${tx.amount} ETB</td>
+                            <td><small>${tx.tx_id}</small></td>
+                            <td>
+                                <button class="btn btn-success btn-sm" onclick="approveTransaction('${tx.tx_id}')">✅ Approve</button>
+                                <button class="btn btn-danger btn-sm" onclick="rejectTransaction('${tx.tx_id}')">❌ Reject</button>
+                            </td>
+                        `;
+                    });
+                }
+            } catch (error) {
+                console.error('Failed to load transactions:', error);
+            }
+        }
+
+        // ==================== LOAD USERS ====================
+        async function loadUsers() {
+            try {
+                let response = await fetch(`${API_URL}/api/admin/users?admin_id=${adminId}`);
+                let data = await response.json();
+                
+                if (data.success) {
+                    allUsers = data.users;
+                    displayUsers(data.users);
+                }
+            } catch (error) {
+                console.error('Failed to load users:', error);
+            }
+        }
+
+        function displayUsers(users) {
+            let tbody = document.getElementById('usersList');
+            tbody.innerHTML = '';
+            
+            users.forEach(user => {
+                let row = tbody.insertRow();
+                row.innerHTML = `
+                    <td>${user.telegram_id}</td>
+                    <td>@${user.username || '-'}</td>
+                    <td>${user.name}</td>
+                    <td><strong>${user.balance} ETB</strong></td>
+                    <td>${user.games_played}</td>
+                    <td>${user.wins} ETB</td>
+                    <td>${user.total_deposits} ETB</td>
+                    <td>${user.phone || '-'}</td>
+                    <td>${user.is_admin ? '👑' : '-'}</td>
+                    <td>
+                        <button class="btn btn-warning btn-sm" onclick="editBalance('${user.telegram_id}', '${user.name}', ${user.balance})">💰 Edit</button>
+                    </td>
+                `;
+            });
+        }
+
+        function searchUsers() {
+            let search = document.getElementById('userSearch').value.toLowerCase();
+            let filtered = allUsers.filter(user => 
+                (user.username && user.username.toLowerCase().includes(search)) ||
+                (user.name && user.name.toLowerCase().includes(search)) ||
+                user.telegram_id.toString().includes(search)
+            );
+            displayUsers(filtered);
+        }
+
+        // ==================== LOAD LOGS ====================
+        async function loadLogs() {
+            try {
+                let response = await fetch(`${API_URL}/api/admin/logs?admin_id=${adminId}`);
+                let data = await response.json();
+                
+                if (data.success) {
+                    let logsDiv = document.getElementById('logsList');
+                    logsDiv.innerHTML = '';
+                    
+                    data.logs.forEach(log => {
+                        let entry = document.createElement('div');
+                        entry.className = 'log-entry';
+                        entry.innerHTML = `
+                            <span class="log-time">[${new Date(log.time).toLocaleString()}]</span>
+                            <span class="log-admin">${log.admin}</span>
+                            <span class="log-action">${log.action}</span>
+                            <span>${log.details}</span>
+                        `;
+                        logsDiv.appendChild(entry);
+                    });
+                }
+            } catch (error) {
+                console.error('Failed to load logs:', error);
+            }
+        }
+
+        // ==================== TRANSACTION ACTIONS ====================
+        async function approveTransaction(txId) {
+            if (!confirm('Approve this transaction?')) return;
+            
+            try {
+                let response = await fetch(`${API_URL}/api/admin/approve-transaction`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        admin_id: adminId,
+                        tx_id: txId
+                    })
+                });
+                
+                let data = await response.json();
+                if (data.success) {
+                    alert('Transaction approved!');
+                    loadTransactions();
+                    loadStats();
+                }
+            } catch (error) {
+                alert('Failed to approve transaction');
+            }
+        }
+
+        async function rejectTransaction(txId) {
+            if (!confirm('Reject this transaction?')) return;
+            
+            try {
+                let response = await fetch(`${API_URL}/api/admin/reject-transaction`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        admin_id: adminId,
+                        tx_id: txId
+                    })
+                });
+                
+                let data = await response.json();
+                if (data.success) {
+                    alert('Transaction rejected!');
+                    loadTransactions();
+                }
+            } catch (error) {
+                alert('Failed to reject transaction');
+            }
+        }
+
+        // ==================== SETTINGS ====================
+        async function saveSettings() {
+            let settings = {
+                admin_id: adminId,
+                game_type: document.getElementById('gameType').value,
+                card_price: parseInt(document.getElementById('cardPrice').value),
+                prize_pool: parseInt(document.getElementById('prizePool').value),
+                min_cards_to_start: parseInt(document.getElementById('minCards').value),
+                call_interval: parseInt(document.getElementById('callInterval').value)
+            };
+            
+            try {
+                let response = await fetch(`${API_URL}/api/admin/update-settings`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(settings)
+                });
+                
+                let data = await response.json();
+                if (data.success) {
+                    alert('Settings saved!');
+                    loadSettings();
+                }
+            } catch (error) {
+                alert('Failed to save settings');
+            }
+        }
+
+        // ==================== USER BALANCE ====================
+        let currentEditUser = null;
+        
+        function editBalance(telegramId, name, balance) {
+            currentEditUser = telegramId;
+            document.getElementById('editUser').value = `${name} (${telegramId})`;
+            document.getElementById('currentBalance').value = balance + ' ETB';
+            document.getElementById('editAmount').value = '';
+            document.getElementById('editOperation').value = 'add';
+            openModal('balanceModal');
+        }
+
+        async function updateBalance() {
+            let amount = parseInt(document.getElementById('editAmount').value);
+            let operation = document.getElementById('editOperation').value;
+            
+            if (!amount || amount <= 0) {
+                alert('Please enter a valid amount');
+                return;
+            }
+            
+            try {
+                let response = await fetch(`${API_URL}/api/admin/update-balance`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        admin_id: adminId,
+                        target_id: currentEditUser,
+                        amount: amount,
+                        operation: operation
+                    })
+                });
+                
+                let data = await response.json();
+                if (data.success) {
+                    alert(`Balance updated! New balance: ${data.new_balance} ETB`);
+                    closeModal('balanceModal');
+                    loadUsers();
+                    loadStats();
+                }
+            } catch (error) {
+                alert('Failed to update balance');
+            }
+        }
+
+        // ==================== GAME ACTIONS ====================
+        async function startNewGame() {
+            if (!confirm('Start a new game session?')) return;
+            
+            try {
+                let response = await fetch(`${API_URL}/api/admin/start-game`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({admin_id: adminId})
+                });
+                
+                let data = await response.json();
+                if (data.success) {
+                    alert(`New game started! Session ID: ${data.session_id}`);
+                }
+            } catch (error) {
+                alert('Failed to start game');
+            }
+        }
+
+        async function declareWinner() {
+            let sessionId = document.getElementById('winnerSession').value;
+            let userId = document.getElementById('winnerUserId').value;
+            let card = document.getElementById('winningCard').value;
+            
+            if (!sessionId || !userId) {
+                alert('Please fill all fields');
+                return;
+            }
+            
+            try {
+                let response = await fetch(`${API_URL}/api/admin/end-game`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        admin_id: adminId,
+                        session_id: sessionId,
+                        winner_id: userId,
+                        winning_card: card
+                    })
+                });
+                
+                let data = await response.json();
+                if (data.success) {
+                    alert('Winner declared!');
+                }
+            } catch (error) {
+                alert('Failed to declare winner');
+            }
+        }
+
+        // ==================== BROADCAST ====================
+        function showBroadcastModal() {
+            openModal('broadcastModal');
+        }
+
+        async function sendBroadcast() {
+            let message = document.getElementById('broadcastMessage').value;
+            
+            if (!message) {
+                alert('Please enter a message');
+                return;
+            }
+            
+            // This would need a broadcast endpoint
+            alert('Broadcast feature coming soon!');
+            closeModal('broadcastModal');
+        }
+
+        // ==================== MODAL FUNCTIONS ====================
+        function openModal(modalId) {
+            document.getElementById(modalId).classList.add('active');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
+
+        // ==================== REFRESH ====================
+        function refreshAll() {
+            loadStats();
+            loadSettings();
+            loadTransactions();
+            loadUsers();
+            loadLogs();
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            if (event.target.classList.contains('modal')) {
+                event.target.classList.remove('active');
+            }
+        }
+    </script>
+</body>
+</html>
