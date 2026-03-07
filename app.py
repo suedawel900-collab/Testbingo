@@ -1,10 +1,11 @@
 import os
 import sqlite3
+import asyncio
 import threading
 import logging
 from datetime import datetime
 from flask import Flask, request, jsonify, render_template
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler, ContextTypes
 
 # Setup logging
@@ -15,10 +16,11 @@ logger = logging.getLogger(__name__)
 application = Flask(__name__)  # CRITICAL: Named 'application' for Gunicorn
 app = application
 
-# Configuration
+# Configuration - FIX: Add https:// to URL
 BOT_TOKEN = os.environ.get('BOT_TOKEN')
 ADMIN_ID = int(os.environ.get('ADMIN_ID', '0'))
-APP_URL = os.environ.get('RAILWAY_STATIC_URL', 'http://localhost:5000')
+RAILWAY_URL = os.environ.get('RAILWAY_STATIC_URL', 'localhost:5000')
+APP_URL = f"https://{RAILWAY_URL}"  # FIX: Add https://
 
 logger.info(f"Starting with BOT_TOKEN: {BOT_TOKEN[:5] if BOT_TOKEN else 'None'}...")
 logger.info(f"APP_URL: {APP_URL}")
@@ -37,10 +39,11 @@ def init_db():
                   telegram_id INTEGER UNIQUE,
                   username TEXT,
                   first_name TEXT,
-                  balance INTEGER DEFAULT 0,
+                  balance INTEGER DEFAULT 1000,
                   games_played INTEGER DEFAULT 0,
                   wins INTEGER DEFAULT 0,
                   total_deposits INTEGER DEFAULT 0,
+                  phone_number TEXT,
                   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     
     # Transactions table
@@ -81,7 +84,8 @@ def get_user(telegram_id):
             'games_played': user[5],
             'wins': user[6],
             'total_deposits': user[7],
-            'created_at': user[8]
+            'phone_number': user[8],
+            'created_at': user[9]
         }
     return None
 
@@ -94,6 +98,16 @@ def create_user(telegram_id, username, first_name):
     conn.commit()
     conn.close()
     logger.info(f"User created: {username} ({telegram_id})")
+
+def update_user_phone(telegram_id, phone_number):
+    """Update user's phone number"""
+    conn = sqlite3.connect('database/bingo.db')
+    c = conn.cursor()
+    c.execute("UPDATE users SET phone_number = ? WHERE telegram_id = ?",
+              (phone_number, telegram_id))
+    conn.commit()
+    conn.close()
+    logger.info(f"Phone updated for {telegram_id}: {phone_number}")
 
 def add_transaction(user_id, tx_id, amount):
     """Add new transaction"""
@@ -134,12 +148,30 @@ def approve_transaction(tx_id, admin_id):
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /start command"""
     user = update.effective_user
+    logger.info(f"Start from {user.first_name} (ID: {user.id})")
     
-    if not get_user(user.id):
-        create_user(user.id, user.username, user.first_name)
-    
+    # Create or get user
     db_user = get_user(user.id)
+    if not db_user:
+        create_user(user.id, user.username, user.first_name)
+        db_user = get_user(user.id)
     
+    # Check if phone number is needed
+    if not db_user['phone_number']:
+        # Ask for phone number
+        contact_keyboard = [
+            [KeyboardButton("📱 Share Phone Number", request_contact=True)],
+            [KeyboardButton("❌ Skip")]
+        ]
+        reply_markup = ReplyKeyboardMarkup(contact_keyboard, resize_keyboard=True, one_time_keyboard=True)
+        
+        await update.message.reply_text(
+            "📱 Please share your phone number for verification:",
+            reply_markup=reply_markup
+        )
+        return
+    
+    # Create web app button with HTTPS URL
     keyboard = [
         [InlineKeyboardButton("🎮 PLAY BINGO", web_app={"url": f"{APP_URL}/game?user={user.id}"})],
         [
@@ -153,6 +185,34 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"💰 Balance: {db_user['balance']} ETB",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
+
+async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle shared contact"""
+    contact = update.message.contact
+    user = update.effective_user
+    
+    if contact and contact.user_id == user.id:
+        # Save phone number
+        update_user_phone(user.id, contact.phone_number)
+        
+        await update.message.reply_text(f"✅ Phone number saved!")
+        
+        # Now show main menu
+        db_user = get_user(user.id)
+        keyboard = [
+            [InlineKeyboardButton("🎮 PLAY BINGO", web_app={"url": f"{APP_URL}/game?user={user.id}"})],
+            [
+                InlineKeyboardButton("💰 DEPOSIT", callback_data="deposit"),
+                InlineKeyboardButton("📊 STATS", callback_data="stats")
+            ]
+        ]
+        
+        await update.message.reply_text(
+            f"🎰 You can now play!",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    else:
+        await update.message.reply_text("❌ Please share your own contact")
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle button callbacks"""
@@ -233,29 +293,36 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except ValueError:
             await update.message.reply_text("❌ Invalid amount")
 
-# ==================== BOT SETUP ====================
+# ==================== FIXED BOT SETUP ====================
 def run_bot():
-    """Run bot in a separate thread"""
+    """Run bot in a separate thread with proper event loop"""
     if not BOT_TOKEN:
         logger.error("No BOT_TOKEN")
         return
     
     try:
+        # Create new event loop for this thread
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
         # Create application
         bot_app = Application.builder().token(BOT_TOKEN).build()
         
         # Add handlers
         bot_app.add_handler(CommandHandler("start", start))
         bot_app.add_handler(CallbackQueryHandler(button_handler))
+        bot_app.add_handler(MessageHandler(filters.CONTACT, handle_contact))
         bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
         
         logger.info("Starting bot polling...")
         
-        # Run polling (this blocks the thread)
+        # Run polling
         bot_app.run_polling(drop_pending_updates=True)
         
     except Exception as e:
         logger.error(f"Bot error: {e}")
+    finally:
+        loop.close()
 
 # Start bot in a background thread
 if BOT_TOKEN:
@@ -296,7 +363,8 @@ def get_user_data(telegram_id):
 def health():
     return jsonify({
         'status': 'ok',
-        'bot': 'running' if BOT_TOKEN else 'no token'
+        'bot': 'running' if BOT_TOKEN else 'no token',
+        'url': APP_URL
     })
 
 # ==================== MAIN ====================
