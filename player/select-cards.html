@@ -1,0 +1,157 @@
+<!-- player/select-cards.html -->
+<!DOCTYPE html>
+<html lang="am">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ካርዶች ይምረጡ</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>🎫 የቢንጎ ካርዶች</h1>
+        
+        <div class="cards-grid" id="cardsGrid"></div>
+        
+        <div class="selection-footer">
+            <div class="selected-info">
+                የተመረጡ ካርዶች: <span id="selectedCount">0</span>
+                <br>
+                ጠቅላላ ክፍያ: <span id="totalPrice">0</span> ብር
+            </div>
+            
+            <button onclick="confirmSelection()" class="btn btn-success" id="confirmBtn" disabled>
+                ኮንፊርም እና ክፈሉ
+            </button>
+        </div>
+    </div>
+
+    <script type="module">
+        import { database, ref, push, set, get, child } from '../js/firebase-config.js';
+
+        const cardCount = localStorage.getItem('selectedCardCount');
+        const pricePerCard = 10; // ከአስተዳዳሪ ይመጣል
+        const totalPrice = localStorage.getItem('totalPrice');
+        
+        let selectedCards = [];
+        
+        // ካርዶችን መፍጠር
+        function generateCards() {
+            const grid = document.getElementById('cardsGrid');
+            
+            for (let i = 0; i < cardCount; i++) {
+                const card = generateBingoCard(i);
+                grid.appendChild(card);
+            }
+        }
+
+        function generateBingoCard(index) {
+            const card = document.createElement('div');
+            card.className = 'bingo-card';
+            card.dataset.index = index;
+            
+            const numbers = generateBingoNumbers();
+            
+            let html = '<div class="bingo-card-header">ካርድ ' + (index + 1) + '</div>';
+            html += '<div class="bingo-card-body">';
+            
+            // B I N G O headers
+            html += '<div class="bingo-row header">';
+            ['B', 'I', 'N', 'G', 'O'].forEach(letter => {
+                html += '<div class="bingo-cell header">' + letter + '</div>';
+            });
+            html += '</div>';
+            
+            // Numbers
+            for (let row = 0; row < 5; row++) {
+                html += '<div class="bingo-row">';
+                for (let col = 0; col < 5; col++) {
+                    const num = numbers[row][col];
+                    html += '<div class="bingo-cell">' + (num || 'FREE') + '</div>';
+                }
+                html += '</div>';
+            }
+            
+            html += '</div>';
+            html += '<div class="bingo-card-footer">';
+            html += '<input type="checkbox" class="card-select" data-card-index="' + index + '">';
+            html += '<label>ይምረጡ</label>';
+            html += '</div>';
+            
+            card.innerHTML = html;
+            
+            // ምርጫን መቆጣጠር
+            const checkbox = card.querySelector('.card-select');
+            checkbox.addEventListener('change', function(e) {
+                if (this.checked) {
+                    selectedCards.push(index);
+                } else {
+                    selectedCards = selectedCards.filter(i => i !== index);
+                }
+                
+                document.getElementById('selectedCount').textContent = selectedCards.length;
+                document.getElementById('totalPrice').textContent = selectedCards.length * pricePerCard;
+                
+                document.getElementById('confirmBtn').disabled = selectedCards.length === 0;
+            });
+            
+            return card;
+        }
+
+        function generateBingoNumbers() {
+            const numbers = [];
+            for (let row = 0; row < 5; row++) {
+                const rowNumbers = [];
+                for (let col = 0; col < 5; col++) {
+                    if (row === 2 && col === 2) {
+                        rowNumbers.push(null); // FREE space
+                    } else {
+                        const min = col * 15 + 1;
+                        const max = (col + 1) * 15;
+                        rowNumbers.push(Math.floor(Math.random() * (max - min + 1)) + min);
+                    }
+                }
+                numbers.push(rowNumbers);
+            }
+            return numbers;
+        }
+
+        window.confirmSelection = async function() {
+            if (selectedCards.length === 0) return;
+            
+            const playerId = localStorage.getItem('playerId');
+            const gameRef = ref(database, 'activeGame/players/' + playerId);
+            
+            // ካርዶችን ማስቀመጥ
+            const cards = [];
+            document.querySelectorAll('.bingo-card').forEach((card, idx) => {
+                if (selectedCards.includes(idx)) {
+                    // የካርድ ቁጥሮችን ማምጣት
+                    const cardNumbers = [];
+                    const rows = card.querySelectorAll('.bingo-row:not(.header)');
+                    rows.forEach(row => {
+                        const rowNumbers = [];
+                        row.querySelectorAll('.bingo-cell').forEach(cell => {
+                            rowNumbers.push(cell.textContent === 'FREE' ? 'FREE' : parseInt(cell.textContent));
+                        });
+                        cardNumbers.push(rowNumbers);
+                    });
+                    cards.push(cardNumbers);
+                }
+            });
+            
+            await set(gameRef, {
+                cards: cards,
+                balance: parseInt(localStorage.getItem('totalPrice')),
+                markedNumbers: [],
+                status: 'active'
+            });
+            
+            // ወደ ጨዋታ ገጽ መሄድ
+            window.location.href = 'game.html';
+        }
+
+        generateCards();
+    </script>
+</body>
+</html>
