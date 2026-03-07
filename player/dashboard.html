@@ -1,0 +1,98 @@
+<!-- player/dashboard.html -->
+<!DOCTYPE html>
+<html lang="am">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ተጫዋች ዳሽቦርድ</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>👤 ተጫዋች ዳሽቦርድ</h1>
+            <div class="balance" id="playerBalance">ብር: 1000</div>
+        </div>
+
+        <div class="active-game-section" id="activeGameSection" style="display: none;">
+            <h2>ንቁ ጨዋታ አለ</h2>
+            <button onclick="joinActiveGame()" class="btn btn-success">ወደ ጨዋታ ይግቡ</button>
+        </div>
+
+        <div class="new-game-section">
+            <h2>አዲስ ጨዋታ ይጀምሩ</h2>
+            
+            <div class="game-settings">
+                <div class="setting-item">
+                    <label>የካርድ ብዛት (1-1000):</label>
+                    <input type="number" id="cardCount" min="1" max="1000" value="1">
+                </div>
+
+                <div class="price-info">
+                    <p>የአንድ ካርድ ዋጋ: <span id="cardPrice">10</span> ብር</p>
+                    <p>ጠቅላላ ክፍያ: <span id="totalPrice">10</span> ብር</p>
+                </div>
+
+                <button onclick="selectCards()" class="btn btn-primary">ካርዶች ይምረጡ</button>
+            </div>
+        </div>
+
+        <div class="cards-preview" id="cardsPreview"></div>
+    </div>
+
+    <script type="module">
+        import { database, ref, onValue, get, child } from '../js/firebase-config.js';
+
+        let playerId = localStorage.getItem('playerId') || 'player_' + Math.random().toString(36).substr(2, 9);
+        localStorage.setItem('playerId', playerId);
+
+        // የተጫዋች ብር መጠን
+        let playerBalance = 1000;
+
+        // የአስተዳዳሪ ቅንብሮችን ማምጣት
+        onValue(ref(database, 'gameSettings'), (snapshot) => {
+            const settings = snapshot.val() || {};
+            document.getElementById('cardPrice').textContent = settings.cardPrice || 10;
+            updateTotalPrice();
+        });
+
+        // ጠቅላላ ዋጋ ማስላት
+        document.getElementById('cardCount').addEventListener('input', updateTotalPrice);
+        
+        function updateTotalPrice() {
+            const count = document.getElementById('cardCount').value;
+            const price = document.getElementById('cardPrice').textContent;
+            document.getElementById('totalPrice').textContent = count * price;
+        }
+
+        // ንቁ ጨዋታ መኖሩን ማረጋገጥ
+        onValue(ref(database, 'activeGame'), (snapshot) => {
+            const game = snapshot.val();
+            if (game && game.status === 'active') {
+                document.getElementById('activeGameSection').style.display = 'block';
+            } else {
+                document.getElementById('activeGameSection').style.display = 'none';
+            }
+        });
+
+        window.selectCards = function() {
+            const count = document.getElementById('cardCount').value;
+            const totalPrice = parseInt(document.getElementById('totalPrice').textContent);
+            
+            if (playerBalance < totalPrice) {
+                alert('በቂ ብር የለዎትም!');
+                return;
+            }
+
+            // ወደ ካርድ ምርጫ ገጽ መሄድ
+            localStorage.setItem('selectedCardCount', count);
+            localStorage.setItem('totalPrice', totalPrice);
+            window.location.href = 'select-cards.html';
+        }
+
+        window.joinActiveGame = function() {
+            window.location.href = 'game.html';
+        }
+    </script>
+</body>
+</html>
