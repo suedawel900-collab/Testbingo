@@ -921,6 +921,7 @@ def admin_approve_transaction():
     telegram_id, amount = approve_transaction(tx_id, user['id'])
     
     if telegram_id:
+        log_admin_action(user['id'], 'approve_transaction', f'{amount} ETB for {telegram_id}')
         return jsonify({
             'success': True,
             'message': f'Approved {amount} ETB for user {telegram_id}'
@@ -983,7 +984,7 @@ def admin_update_balance():
     conn.commit()
     conn.close()
     
-    log_admin_action(user['id'], f'update_balance_{operation}', f'{target_id}: {amount}')
+    log_admin_action(user['id'], f'update_balance_{operation}', f'{target_id}: {amount} ETB')
     
     return jsonify({'success': True, 'new_balance': new_balance})
 
@@ -1025,7 +1026,7 @@ def admin_end_game():
     
     end_game_session(session_id, winner_id, winning_card)
     
-    log_admin_action(user['id'], 'end_game', session_id)
+    log_admin_action(user['id'], 'end_game', f'Session {session_id} - Winner: {winner_id}')
     
     return jsonify({'success': True})
 
