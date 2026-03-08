@@ -1,6 +1,7 @@
 import os
 import sqlite3
 import threading
+import asyncio
 import logging
 import time
 import json
@@ -469,12 +470,12 @@ def end_game_session(session_id, winner_ids):
     conn.close()
     return released_count
 
-# ==================== SIMPLE BOT WITH THREADING ====================
+# ==================== FIXED BOT WITH EVENT LOOP ====================
 def run_bot():
-    """Simple bot function that runs in a thread"""
+    """Simple bot function that runs in a thread with proper event loop"""
     import asyncio
-    from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
-    from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler, ContextTypes
+    from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+    from telegram.ext import Application, CommandHandler, ContextTypes
     
     if not BOT_TOKEN:
         logger.error("No BOT_TOKEN")
@@ -482,11 +483,14 @@ def run_bot():
     
     logger.info(f"Starting bot in thread...")
     
+    # Create new event loop for this thread
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    
     async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user = update.effective_user
         logger.info(f"Start from {user.first_name}")
         
-        # Simple response without database for now
         keyboard = [
             [InlineKeyboardButton("🎮 PLAY BINGO", web_app={"url": f"{APP_URL}/game?user={user.id}"})]
         ]
@@ -501,7 +505,14 @@ def run_bot():
     application.add_handler(CommandHandler("start", start))
     
     logger.info("Bot started polling...")
-    application.run_polling(drop_pending_updates=True)
+    
+    # Run the application with the event loop
+    try:
+        application.run_polling(drop_pending_updates=True)
+    except Exception as e:
+        logger.error(f"Bot error: {e}")
+    finally:
+        loop.close()
 
 # Start bot in a daemon thread
 if BOT_TOKEN:
@@ -556,9 +567,10 @@ def get_card_status():
     
     user_id = request.args.get('user_id')
     if user_id:
-        c.execute("SELECT card_number FROM purchased_cards WHERE user_id = ? AND status = 'active'", 
-                  (get_user(int(user_id))['id'] if get_user(int(user_id)) else 0,))
-        my_cards = [row[0] for row in c.fetchall()]
+        user = get_user(int(user_id))
+        if user:
+            c.execute("SELECT card_number FROM purchased_cards WHERE user_id = ? AND status = 'active'", (user['id'],))
+            my_cards = [row[0] for row in c.fetchall()]
     
     conn.close()
     
