@@ -5,6 +5,8 @@ import logging
 import time
 import json
 import uuid
+import fcntl
+import sys
 from datetime import datetime
 from flask import Flask, request, jsonify, render_template, session
 
@@ -33,6 +35,33 @@ logger.info(f"Starting with BOT_TOKEN: {BOT_TOKEN[:5] if BOT_TOKEN else 'None'}.
 logger.info(f"APP_URL: {APP_URL}")
 logger.info(f"IS_MAIN_PROCESS: {IS_MAIN_PROCESS}")
 logger.info(f"ADMIN_ID: {ADMIN_ID}")
+
+# ==================== LOCK FILE FOR BOT ====================
+LOCK_FILE = 'bot.lock'
+
+def acquire_lock():
+    """Acquire a lock file to ensure only one bot instance runs"""
+    try:
+        lock_file = open(LOCK_FILE, 'w')
+        fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        lock_file.write(str(os.getpid()))
+        lock_file.flush()
+        logger.info(f"Lock acquired by process {os.getpid()}")
+        return lock_file
+    except (IOError, OSError):
+        logger.error(f"Another bot instance is already running (lock file exists)")
+        return None
+
+def release_lock(lock_file):
+    """Release the lock file"""
+    if lock_file:
+        fcntl.flock(lock_file, fcntl.LOCK_UN)
+        lock_file.close()
+        try:
+            os.unlink(LOCK_FILE)
+        except:
+            pass
+        logger.info("Lock released")
 
 # ==================== DATABASE SETUP ====================
 def init_db():
@@ -118,7 +147,7 @@ def init_db():
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   session_id TEXT,
                   user_id INTEGER,
-                  cards TEXT,  -- JSON array of card numbers
+                  cards TEXT,
                   cards_bought INTEGER,
                   paid_amount INTEGER,
                   has_bingo BOOLEAN DEFAULT 0,
@@ -425,7 +454,7 @@ def create_game_session(settings):
     return session_id
 
 def end_game_session(session_id, winner_ids):
-    """End a game session and distribute prizes to winners ONLY"""
+    """End a game session, distribute prizes, and release cards for next round"""
     conn = sqlite3.connect('database/bingo.db')
     c = conn.cursor()
     
@@ -435,11 +464,10 @@ def end_game_session(session_id, winner_ids):
     
     if session:
         total_cards, card_price, house_fee = session
-        total_prize = total_cards * card_price  # Total prize pool from card sales
-        house_amount = int(total_prize * house_fee / 100)  # House fee
-        players_prize = total_prize - house_amount  # Prize for players
+        total_prize = total_cards * card_price
+        house_amount = int(total_prize * house_fee / 100)
+        players_prize = total_prize - house_amount
         
-        # Prize per winner (split equally among winners)
         winner_count = len(winner_ids)
         prize_per_winner = players_prize // winner_count if winner_count > 0 else 0
         
@@ -458,28 +486,33 @@ def end_game_session(session_id, winner_ids):
                   (session_id, total_cards, card_price, total_prize, 
                    house_fee, house_amount, players_prize, winner_count))
         
-        # Update winners' balances (add prize money)
+        # Update winners' balances
         for winner_id in winner_ids:
-            # Get user's database id
             c.execute("SELECT id FROM users WHERE telegram_id = ?", (winner_id,))
             user_result = c.fetchone()
             if user_result:
                 user_db_id = user_result[0]
-                # Add prize to winner's balance
                 c.execute("UPDATE users SET balance = balance + ?, wins = wins + ? WHERE id = ?",
                          (prize_per_winner, prize_per_winner, user_db_id))
                 
-                # Record win in game participants
                 c.execute('''UPDATE game_participants 
                              SET has_bingo = 1, prize_won = ? 
                              WHERE session_id = ? AND user_id = ?''',
                           (prize_per_winner, session_id, user_db_id))
         
+        # Release all cards for next round
+        c.execute('''UPDATE purchased_cards 
+                     SET status = 'released' 
+                     WHERE session_id = ?''', (session_id,))
+        
+        released_count = c.rowcount
+        logger.info(f"Released {released_count} cards from session {session_id} for next round")
         logger.info(f"Game {session_id} ended. House: {house_amount} ETB, "
                    f"Players: {players_prize} ETB split among {winner_count} winners")
     
     conn.commit()
     conn.close()
+    return released_count
 
 # ==================== CARD PURCHASE FUNCTIONS ====================
 def check_cards_available(card_numbers):
@@ -533,9 +566,9 @@ def get_all_purchased_cards():
     conn.close()
     return cards
 
-# ==================== BOT PROCESS ====================
+# ==================== BOT PROCESS WITH LOCK ====================
 def run_bot_process():
-    """Run bot in a separate process"""
+    """Run bot in a separate process with lock file"""
     import asyncio
     from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
     from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler, ContextTypes
@@ -543,119 +576,82 @@ def run_bot_process():
     
     logger.info(f"Bot process started with PID: {os.getpid()}")
     
-    # Database functions for bot process
-    def bot_get_user(telegram_id):
-        conn = sqlite3.connect('database/bingo.db')
-        c = conn.cursor()
-        c.execute("SELECT * FROM users WHERE telegram_id = ?", (telegram_id,))
-        user = c.fetchone()
-        conn.close()
-        return user
+    # Try to acquire lock
+    lock_file = acquire_lock()
+    if not lock_file:
+        logger.error("Could not acquire lock - another bot instance is running")
+        return
     
-    def bot_create_user(telegram_id, username, first_name):
-        conn = sqlite3.connect('database/bingo.db')
-        c = conn.cursor()
-        c.execute("INSERT OR IGNORE INTO users (telegram_id, username, first_name) VALUES (?, ?, ?)",
-                  (telegram_id, username, first_name))
-        conn.commit()
-        conn.close()
-    
-    def bot_update_phone(telegram_id, phone_number):
-        conn = sqlite3.connect('database/bingo.db')
-        c = conn.cursor()
-        c.execute("UPDATE users SET phone_number = ? WHERE telegram_id = ?",
-                  (phone_number, telegram_id))
-        conn.commit()
-        conn.close()
-    
-    def bot_add_transaction(user_id, amount, tx_id):
-        conn = sqlite3.connect('database/bingo.db')
-        c = conn.cursor()
-        receipt_url = f"https://transactioninfo.ethiotelecom.et/receipt/{tx_id}"
-        c.execute("INSERT INTO transactions (user_id, amount, tx_id, receipt_url) VALUES (?, ?, ?, ?)",
-                  (user_id, amount, tx_id, receipt_url))
-        conn.commit()
-        conn.close()
-    
-    # ==================== BOT HANDLERS ====================
-    async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        user = update.effective_user
-        logger.info(f"Start from {user.first_name} (ID: {user.id})")
+    try:
+        # Database functions for bot process
+        def bot_get_user(telegram_id):
+            conn = sqlite3.connect('database/bingo.db')
+            c = conn.cursor()
+            c.execute("SELECT * FROM users WHERE telegram_id = ?", (telegram_id,))
+            user = c.fetchone()
+            conn.close()
+            return user
         
-        # Get or create user
-        db_user = bot_get_user(user.id)
-        if not db_user:
-            bot_create_user(user.id, user.username, user.first_name)
-            db_user = bot_get_user(user.id)
+        def bot_create_user(telegram_id, username, first_name):
+            conn = sqlite3.connect('database/bingo.db')
+            c = conn.cursor()
+            c.execute("INSERT OR IGNORE INTO users (telegram_id, username, first_name) VALUES (?, ?, ?)",
+                      (telegram_id, username, first_name))
+            conn.commit()
+            conn.close()
+        
+        def bot_update_phone(telegram_id, phone_number):
+            conn = sqlite3.connect('database/bingo.db')
+            c = conn.cursor()
+            c.execute("UPDATE users SET phone_number = ? WHERE telegram_id = ?",
+                      (phone_number, telegram_id))
+            conn.commit()
+            conn.close()
+        
+        def bot_add_transaction(user_id, amount, tx_id):
+            conn = sqlite3.connect('database/bingo.db')
+            c = conn.cursor()
+            receipt_url = f"https://transactioninfo.ethiotelecom.et/receipt/{tx_id}"
+            c.execute("INSERT INTO transactions (user_id, amount, tx_id, receipt_url) VALUES (?, ?, ?, ?)",
+                      (user_id, amount, tx_id, receipt_url))
+            conn.commit()
+            conn.close()
+        
+        # ==================== BOT HANDLERS ====================
+        async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            user = update.effective_user
+            logger.info(f"Start from {user.first_name} (ID: {user.id})")
             
+            db_user = bot_get_user(user.id)
             if not db_user:
-                await update.message.reply_text("❌ Error creating user. Please try again.")
-                return
-        
-        # Check if user is admin
-        is_admin = False
-        if db_user and len(db_user) > 9:
-            is_admin = db_user[9] == 1
-            if is_admin:
-                logger.info(f"✅ User {user.id} is an ADMIN")
-        
-        # Check if phone number exists
-        phone_number = db_user[8] if db_user and len(db_user) > 8 else None
-        
-        if not phone_number:
-            contact_keyboard = [
-                [KeyboardButton("📱 Share Phone Number", request_contact=True)],
-                [KeyboardButton("❌ Skip")]
-            ]
-            reply_markup = ReplyKeyboardMarkup(contact_keyboard, resize_keyboard=True, one_time_keyboard=True)
+                bot_create_user(user.id, user.username, user.first_name)
+                db_user = bot_get_user(user.id)
+                
+                if not db_user:
+                    await update.message.reply_text("❌ Error creating user. Please try again.")
+                    return
             
-            await update.message.reply_text(
-                "📱 Please share your phone number for verification:",
-                reply_markup=reply_markup
-            )
-            return
-        
-        # Create main menu buttons
-        keyboard = [
-            [InlineKeyboardButton("🎮 PLAY BINGO", web_app={"url": f"{APP_URL}/game?user={user.id}"})],
-            [
-                InlineKeyboardButton("💰 DEPOSIT", callback_data="deposit"),
-                InlineKeyboardButton("📊 STATS", callback_data="stats")
-            ],
-            [InlineKeyboardButton("💳 BALANCE", callback_data="balance")]
-        ]
-        
-        # ADD ADMIN BUTTON IF USER IS ADMIN
-        if is_admin:
-            keyboard.append([InlineKeyboardButton("👑 ADMIN PANEL", web_app={"url": f"{APP_URL}/admin?user={user.id}"})])
-        
-        balance = db_user[4] if db_user and len(db_user) > 4 else 1000
-        
-        await update.message.reply_text(
-            f"🎰 Welcome to MK BINGO, {user.first_name}!\n"
-            f"💰 Balance: {balance} ETB",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
-    
-    async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        contact = update.message.contact
-        user = update.effective_user
-        
-        if contact and contact.user_id == user.id:
-            bot_update_phone(user.id, contact.phone_number)
-            await update.message.reply_text(f"✅ Phone number saved!")
-            
-            # Get updated user
-            db_user = bot_get_user(user.id)
-            
-            # Check if admin
             is_admin = False
             if db_user and len(db_user) > 9:
                 is_admin = db_user[9] == 1
+                if is_admin:
+                    logger.info(f"✅ User {user.id} is an ADMIN")
             
-            balance = db_user[4] if db_user and len(db_user) > 4 else 1000
+            phone_number = db_user[8] if db_user and len(db_user) > 8 else None
             
-            # Create main menu
+            if not phone_number:
+                contact_keyboard = [
+                    [KeyboardButton("📱 Share Phone Number", request_contact=True)],
+                    [KeyboardButton("❌ Skip")]
+                ]
+                reply_markup = ReplyKeyboardMarkup(contact_keyboard, resize_keyboard=True, one_time_keyboard=True)
+                
+                await update.message.reply_text(
+                    "📱 Please share your phone number for verification:",
+                    reply_markup=reply_markup
+                )
+                return
+            
             keyboard = [
                 [InlineKeyboardButton("🎮 PLAY BINGO", web_app={"url": f"{APP_URL}/game?user={user.id}"})],
                 [
@@ -668,179 +664,213 @@ def run_bot_process():
             if is_admin:
                 keyboard.append([InlineKeyboardButton("👑 ADMIN PANEL", web_app={"url": f"{APP_URL}/admin?user={user.id}"})])
             
+            balance = db_user[4] if db_user and len(db_user) > 4 else 1000
+            
             await update.message.reply_text(
-                f"🎰 You can now play!",
+                f"🎰 Welcome to MK BINGO, {user.first_name}!\n"
+                f"💰 Balance: {balance} ETB",
                 reply_markup=InlineKeyboardMarkup(keyboard)
             )
-        else:
-            await update.message.reply_text("❌ Please share your own contact")
-    
-    async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        query = update.callback_query
-        await query.answer()
         
-        data = query.data
-        user = query.from_user
-        
-        if data == "balance":
-            db_user = bot_get_user(user.id)
-            balance = db_user[4] if db_user and len(db_user) > 4 else 1000
-            total_deposits = db_user[7] if db_user and len(db_user) > 7 else 0
+        async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            contact = update.message.contact
+            user = update.effective_user
             
-            await query.edit_message_text(
-                f"💳 *Your Balance*\n\n"
-                f"Available: *{balance} ETB*\n"
-                f"Total Deposits: *{total_deposits} ETB*",
-                parse_mode='Markdown'
-            )
-        
-        elif data == "stats":
-            db_user = bot_get_user(user.id)
-            balance = db_user[4] if db_user and len(db_user) > 4 else 1000
-            games_played = db_user[5] if db_user and len(db_user) > 5 else 0
-            wins = db_user[6] if db_user and len(db_user) > 6 else 0
-            
-            await query.edit_message_text(
-                f"📊 *Your Stats*\n\n"
-                f"Balance: *{balance} ETB*\n"
-                f"Games Played: *{games_played}*\n"
-                f"Wins: *{wins} ETB*",
-                parse_mode='Markdown'
-            )
-        
-        elif data == "deposit":
-            await query.edit_message_text(
-                "💰 *Enter Deposit Amount*\n\n"
-                "Please enter the amount you want to deposit (in ETB):\n"
-                "Minimum: 50 ETB\n\n"
-                "Example: `100`",
-                parse_mode='Markdown'
-            )
-            context.user_data['awaiting_amount'] = True
-        
-        elif data.startswith("approve_"):
-            if user.id != ADMIN_ID:
-                await query.edit_message_text("❌ Unauthorized")
-                return
-            
-            tx_id = data.replace("approve_", "")
-            
-            conn = sqlite3.connect('database/bingo.db')
-            c = conn.cursor()
-            c.execute('''UPDATE transactions SET status='approved', approved_by=?, approved_at=? WHERE tx_id=?''',
-                      (ADMIN_ID, datetime.now(), tx_id))
-            c.execute("SELECT user_id, amount FROM transactions WHERE tx_id=?", (tx_id,))
-            result = c.fetchone()
-            if result:
-                user_id, amount = result
-                c.execute("UPDATE users SET balance=balance+?, total_deposits=total_deposits+? WHERE id=?", 
-                         (amount, amount, user_id))
-                c.execute("SELECT telegram_id FROM users WHERE id=?", (user_id,))
-                telegram_id = c.fetchone()[0]
+            if contact and contact.user_id == user.id:
+                bot_update_phone(user.id, contact.phone_number)
+                await update.message.reply_text(f"✅ Phone number saved!")
                 
-                await context.bot.send_message(
-                    telegram_id, 
-                    f"✅ *Deposit Approved!*\n\n"
-                    f"Amount: *{amount} ETB*\n"
-                    f"Transaction ID: `{tx_id}`",
-                    parse_mode='Markdown'
-                )
-            
-            conn.commit()
-            conn.close()
-            
-            await query.edit_message_text(
-                f"✅ *Deposit Approved*",
-                parse_mode='Markdown'
-            )
-        
-        elif data.startswith("reject_"):
-            if user.id != ADMIN_ID:
-                await query.edit_message_text("❌ Unauthorized")
-                return
-            
-            tx_id = data.replace("reject_", "")
-            
-            conn = sqlite3.connect('database/bingo.db')
-            c = conn.cursor()
-            c.execute("UPDATE transactions SET status='rejected' WHERE tx_id=?", (tx_id,))
-            conn.commit()
-            conn.close()
-            
-            await query.edit_message_text(f"❌ Deposit Rejected")
-    
-    async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        user = update.effective_user
-        text = update.message.text.strip()
-        
-        if context.user_data.get('awaiting_amount'):
-            try:
-                amount = int(text)
-                if amount < 50:
-                    await update.message.reply_text("❌ Minimum deposit is 50 ETB")
-                    return
+                db_user = bot_get_user(user.id)
+                is_admin = False
+                if db_user and len(db_user) > 9:
+                    is_admin = db_user[9] == 1
                 
-                context.user_data['deposit_amount'] = amount
-                context.user_data['awaiting_amount'] = False
-                context.user_data['awaiting_tx'] = True
+                balance = db_user[4] if db_user and len(db_user) > 4 else 1000
+                
+                keyboard = [
+                    [InlineKeyboardButton("🎮 PLAY BINGO", web_app={"url": f"{APP_URL}/game?user={user.id}"})],
+                    [
+                        InlineKeyboardButton("💰 DEPOSIT", callback_data="deposit"),
+                        InlineKeyboardButton("📊 STATS", callback_data="stats")
+                    ],
+                    [InlineKeyboardButton("💳 BALANCE", callback_data="balance")]
+                ]
+                
+                if is_admin:
+                    keyboard.append([InlineKeyboardButton("👑 ADMIN PANEL", web_app={"url": f"{APP_URL}/admin?user={user.id}"})])
                 
                 await update.message.reply_text(
-                    "💰 *Enter Transaction ID*\n\n"
-                    "Please send the Telebirr transaction ID you received:\n\n"
-                    "Example: `DC39E2J9ZP`",
+                    f"🎰 You can now play!",
+                    reply_markup=InlineKeyboardMarkup(keyboard)
+                )
+            else:
+                await update.message.reply_text("❌ Please share your own contact")
+        
+        async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            query = update.callback_query
+            await query.answer()
+            
+            data = query.data
+            user = query.from_user
+            
+            if data == "balance":
+                db_user = bot_get_user(user.id)
+                balance = db_user[4] if db_user and len(db_user) > 4 else 1000
+                total_deposits = db_user[7] if db_user and len(db_user) > 7 else 0
+                
+                await query.edit_message_text(
+                    f"💳 *Your Balance*\n\n"
+                    f"Available: *{balance} ETB*\n"
+                    f"Total Deposits: *{total_deposits} ETB*",
+                    parse_mode='Markdown'
+                )
+            
+            elif data == "stats":
+                db_user = bot_get_user(user.id)
+                balance = db_user[4] if db_user and len(db_user) > 4 else 1000
+                games_played = db_user[5] if db_user and len(db_user) > 5 else 0
+                wins = db_user[6] if db_user and len(db_user) > 6 else 0
+                
+                await query.edit_message_text(
+                    f"📊 *Your Stats*\n\n"
+                    f"Balance: *{balance} ETB*\n"
+                    f"Games Played: *{games_played}*\n"
+                    f"Wins: *{wins} ETB*",
+                    parse_mode='Markdown'
+                )
+            
+            elif data == "deposit":
+                await query.edit_message_text(
+                    "💰 *Enter Deposit Amount*\n\n"
+                    "Please enter the amount you want to deposit (in ETB):\n"
+                    "Minimum: 50 ETB\n\n"
+                    "Example: `100`",
+                    parse_mode='Markdown'
+                )
+                context.user_data['awaiting_amount'] = True
+            
+            elif data.startswith("approve_"):
+                if user.id != ADMIN_ID:
+                    await query.edit_message_text("❌ Unauthorized")
+                    return
+                
+                tx_id = data.replace("approve_", "")
+                
+                conn = sqlite3.connect('database/bingo.db')
+                c = conn.cursor()
+                c.execute('''UPDATE transactions SET status='approved', approved_by=?, approved_at=? WHERE tx_id=?''',
+                          (ADMIN_ID, datetime.now(), tx_id))
+                c.execute("SELECT user_id, amount FROM transactions WHERE tx_id=?", (tx_id,))
+                result = c.fetchone()
+                if result:
+                    user_id, amount = result
+                    c.execute("UPDATE users SET balance=balance+?, total_deposits=total_deposits+? WHERE id=?", 
+                             (amount, amount, user_id))
+                    c.execute("SELECT telegram_id FROM users WHERE id=?", (user_id,))
+                    telegram_id = c.fetchone()[0]
+                    
+                    await context.bot.send_message(
+                        telegram_id, 
+                        f"✅ *Deposit Approved!*\n\n"
+                        f"Amount: *{amount} ETB*\n"
+                        f"Transaction ID: `{tx_id}`",
+                        parse_mode='Markdown'
+                    )
+                
+                conn.commit()
+                conn.close()
+                
+                await query.edit_message_text(
+                    f"✅ *Deposit Approved*",
+                    parse_mode='Markdown'
+                )
+            
+            elif data.startswith("reject_"):
+                if user.id != ADMIN_ID:
+                    await query.edit_message_text("❌ Unauthorized")
+                    return
+                
+                tx_id = data.replace("reject_", "")
+                
+                conn = sqlite3.connect('database/bingo.db')
+                c = conn.cursor()
+                c.execute("UPDATE transactions SET status='rejected' WHERE tx_id=?", (tx_id,))
+                conn.commit()
+                conn.close()
+                
+                await query.edit_message_text(f"❌ Deposit Rejected")
+        
+        async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            user = update.effective_user
+            text = update.message.text.strip()
+            
+            if context.user_data.get('awaiting_amount'):
+                try:
+                    amount = int(text)
+                    if amount < 50:
+                        await update.message.reply_text("❌ Minimum deposit is 50 ETB")
+                        return
+                    
+                    context.user_data['deposit_amount'] = amount
+                    context.user_data['awaiting_amount'] = False
+                    context.user_data['awaiting_tx'] = True
+                    
+                    await update.message.reply_text(
+                        "💰 *Enter Transaction ID*\n\n"
+                        "Please send the Telebirr transaction ID you received:\n\n"
+                        "Example: `DC39E2J9ZP`",
+                        parse_mode='Markdown'
+                    )
+                    
+                except ValueError:
+                    await update.message.reply_text("❌ Please enter a valid number")
+            
+            elif context.user_data.get('awaiting_tx'):
+                tx_id = text.upper()
+                amount = context.user_data.get('deposit_amount')
+                
+                if not amount:
+                    await update.message.reply_text("❌ Please start over with /start")
+                    context.user_data.clear()
+                    return
+                
+                db_user = bot_get_user(user.id)
+                if not db_user:
+                    await update.message.reply_text("❌ User not found. Please use /start")
+                    return
+                
+                bot_add_transaction(db_user[0], amount, tx_id)
+                
+                keyboard = [[
+                    InlineKeyboardButton("✅ Approve", callback_data=f"approve_{tx_id}"),
+                    InlineKeyboardButton("❌ Reject", callback_data=f"reject_{tx_id}")
+                ]]
+                
+                receipt_url = f"https://transactioninfo.ethiotelecom.et/receipt/{tx_id}"
+                
+                await context.bot.send_message(
+                    ADMIN_ID,
+                    f"💰 *New Deposit Request*\n\n"
+                    f"👤 User: @{user.username or 'No username'}\n"
+                    f"🆔 ID: {user.id}\n"
+                    f"💳 Amount: *{amount} ETB*\n"
+                    f"🔑 TX ID: `{tx_id}`\n\n"
+                    f"[View Receipt]({receipt_url})",
+                    parse_mode='Markdown',
+                    reply_markup=InlineKeyboardMarkup(keyboard)
+                )
+                
+                await update.message.reply_text(
+                    f"✅ *Deposit Request Sent!*\n\n"
+                    f"Amount: *{amount} ETB*\n"
+                    f"Transaction ID: `{tx_id}`\n\n"
+                    f"Admin will approve within 5 minutes.",
                     parse_mode='Markdown'
                 )
                 
-            except ValueError:
-                await update.message.reply_text("❌ Please enter a valid number")
-        
-        elif context.user_data.get('awaiting_tx'):
-            tx_id = text.upper()
-            amount = context.user_data.get('deposit_amount')
-            
-            if not amount:
-                await update.message.reply_text("❌ Please start over with /start")
                 context.user_data.clear()
-                return
-            
-            db_user = bot_get_user(user.id)
-            if not db_user:
-                await update.message.reply_text("❌ User not found. Please use /start")
-                return
-            
-            bot_add_transaction(db_user[0], amount, tx_id)
-            
-            keyboard = [[
-                InlineKeyboardButton("✅ Approve", callback_data=f"approve_{tx_id}"),
-                InlineKeyboardButton("❌ Reject", callback_data=f"reject_{tx_id}")
-            ]]
-            
-            receipt_url = f"https://transactioninfo.ethiotelecom.et/receipt/{tx_id}"
-            
-            await context.bot.send_message(
-                ADMIN_ID,
-                f"💰 *New Deposit Request*\n\n"
-                f"👤 User: @{user.username or 'No username'}\n"
-                f"🆔 ID: {user.id}\n"
-                f"💳 Amount: *{amount} ETB*\n"
-                f"🔑 TX ID: `{tx_id}`\n\n"
-                f"[View Receipt]({receipt_url})",
-                parse_mode='Markdown',
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
-            
-            await update.message.reply_text(
-                f"✅ *Deposit Request Sent!*\n\n"
-                f"Amount: *{amount} ETB*\n"
-                f"Transaction ID: `{tx_id}`\n\n"
-                f"Admin will approve within 5 minutes.",
-                parse_mode='Markdown'
-            )
-            
-            context.user_data.clear()
-    
-    # Create and run application
-    try:
+        
+        # Create and run application
         bot_app = Application.builder().token(BOT_TOKEN).build()
         bot_app.add_handler(CommandHandler("start", start))
         bot_app.add_handler(CallbackQueryHandler(button_handler))
@@ -854,7 +884,8 @@ def run_bot_process():
         logger.error(f"Conflict error - another bot instance is running: {e}")
     except Exception as e:
         logger.error(f"Bot process error: {e}")
-        time.sleep(5)
+    finally:
+        release_lock(lock_file)
 
 # ==================== START BOT PROCESS ====================
 bot_process = None
@@ -871,19 +902,18 @@ def start_bot_process():
         logger.info("Bot process already running")
         return
     
-    # Try to kill any existing bot processes
+    # Kill any existing bot processes using the lock file
     try:
-        import psutil
-        current_pid = os.getpid()
-        for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+        if os.path.exists(LOCK_FILE):
+            with open(LOCK_FILE, 'r') as f:
+                old_pid = int(f.read().strip())
             try:
-                if proc.info['pid'] != current_pid and 'python' in proc.info['name']:
-                    cmdline = ' '.join(proc.info['cmdline']) if proc.info['cmdline'] else ''
-                    if 'bot' in cmdline.lower() or 'run_bot_process' in cmdline:
-                        logger.info(f"Killing old bot process: {proc.info['pid']}")
-                        proc.kill()
+                os.kill(old_pid, 9)
+                logger.info(f"Killed old bot process {old_pid}")
+                time.sleep(1)
             except:
                 pass
+            os.unlink(LOCK_FILE)
     except:
         pass
     
@@ -896,7 +926,6 @@ if BOT_TOKEN and IS_MAIN_PROCESS:
 
 # ==================== FLASK ROUTES ====================
 
-# Player routes
 @application.route('/')
 def index():
     return render_template('index.html')
@@ -932,7 +961,6 @@ def get_card_status():
     """Get status of all cards (which are purchased)"""
     purchased = get_all_purchased_cards()
     
-    # Get user's cards if user_id provided
     user_id = request.args.get('user_id')
     my_cards = []
     if user_id:
@@ -943,6 +971,29 @@ def get_card_status():
         'purchased': list(purchased.keys()),
         'purchased_by': purchased,
         'my_cards': my_cards
+    })
+
+@application.route('/api/cards/available')
+def get_available_cards():
+    """Get all available cards (not purchased in active session)"""
+    conn = sqlite3.connect('database/bingo.db')
+    c = conn.cursor()
+    
+    c.execute('''SELECT card_number FROM purchased_cards 
+                 WHERE status = 'active' AND session_id IN 
+                 (SELECT session_id FROM game_sessions WHERE status = 'active')
+                 ORDER BY card_number''')
+    
+    purchased_active = [row[0] for row in c.fetchall()]
+    conn.close()
+    
+    all_cards = set(range(1, 1001))
+    available = list(all_cards - set(purchased_active))
+    
+    return jsonify({
+        'success': True,
+        'available': available,
+        'active_purchased': purchased_active
     })
 
 @application.route('/api/cards/purchase', methods=['POST'])
@@ -956,7 +1007,6 @@ def purchase_cards_api():
     if not user_id or not cards:
         return jsonify({'success': False, 'error': 'Missing data'}), 400
     
-    # Get current game session
     conn = sqlite3.connect('database/bingo.db')
     c = conn.cursor()
     c.execute("SELECT session_id FROM game_sessions WHERE status = 'waiting' ORDER BY id DESC LIMIT 1")
@@ -964,7 +1014,6 @@ def purchase_cards_api():
     session_id = session[0] if session else None
     conn.close()
     
-    # Check if cards are available
     conflicts = check_cards_available(cards)
     if conflicts:
         return jsonify({
@@ -973,10 +1022,8 @@ def purchase_cards_api():
             'conflicts': conflicts
         }), 409
     
-    # Purchase cards
     success, failed = purchase_cards(user_id, cards, session_id)
     
-    # Update user balance
     user = get_user(int(user_id))
     if user and user['balance'] >= total_price:
         conn = sqlite3.connect('database/bingo.db')
@@ -1002,22 +1049,18 @@ def get_game_session():
     conn = sqlite3.connect('database/bingo.db')
     c = conn.cursor()
     
-    # Get active or waiting session
     c.execute("SELECT session_id, total_cards_sold, total_players, card_price, status, house_fee FROM game_sessions WHERE status IN ('waiting', 'countdown', 'active') ORDER BY id DESC LIMIT 1")
     session = c.fetchone()
     
     if session:
-        # Calculate prize pool: Total Cards × Card Price
-        prize_pool = session[1] * session[3]  # total_cards_sold × card_price
+        prize_pool = session[1] * session[3]
         
-        # Get players in this session
         c.execute('''SELECT u.telegram_id, u.first_name, p.cards_bought 
                      FROM game_participants p
                      JOIN users u ON p.user_id = u.id
                      WHERE p.session_id = ?''', (session[0],))
         players = [{'id': row[0], 'name': row[1], 'cards': row[2]} for row in c.fetchall()]
         
-        # Check if user is in this game
         in_game = False
         my_cards = []
         if user_id:
@@ -1065,11 +1108,9 @@ def join_game():
     if not user:
         return jsonify({'success': False, 'error': 'User not found'}), 404
     
-    # Get settings for card price
     settings = get_game_settings()
     card_price = settings['card_price']
     
-    # Get or create session
     conn = sqlite3.connect('database/bingo.db')
     c = conn.cursor()
     
@@ -1077,27 +1118,20 @@ def join_game():
     session = c.fetchone()
     
     if not session:
-        # Create new session
         session_id = str(uuid.uuid4())[:8]
         c.execute('''INSERT INTO game_sessions 
                      (session_id, game_type, card_price, status, house_fee) 
                      VALUES (?, ?, ?, 'waiting', ?)''',
                   (session_id, settings['game_type'], card_price, settings['house_fee']))
         session_id = session_id
-        session_cards = 0
-        session_players = 0
     else:
         session_id = session[1]
-        session_cards = session[2]
-        session_players = session[3]
     
-    # Add participant
     c.execute('''INSERT INTO game_participants 
                  (session_id, user_id, cards, cards_bought, paid_amount) 
                  VALUES (?, ?, ?, ?, ?)''',
               (session_id, user['id'], json.dumps(cards), len(cards), total_paid))
     
-    # Update session stats
     c.execute('''UPDATE game_sessions 
                  SET total_cards_sold = total_cards_sold + ?,
                      total_players = total_players + 1
@@ -1106,12 +1140,10 @@ def join_game():
     
     conn.commit()
     
-    # Get updated session
     c.execute("SELECT total_cards_sold, total_players, card_price FROM game_sessions WHERE session_id = ?", (session_id,))
     updated = c.fetchone()
     
-    # Calculate prize pool
-    prize_pool = updated[0] * updated[2]  # total_cards_sold × card_price
+    prize_pool = updated[0] * updated[2]
     
     conn.close()
     
@@ -1140,6 +1172,53 @@ def end_game():
     end_game_session(session_id, winners)
     
     return jsonify({'success': True})
+
+@application.route('/api/game/new-round', methods=['POST'])
+def new_round():
+    """Start a new round - releases all previous cards"""
+    data = request.json
+    admin_id = data.get('admin_id')
+    
+    if not admin_id:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    
+    user = get_user(int(admin_id))
+    if not user or not user['is_admin']:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+    
+    settings = get_game_settings()
+    
+    conn = sqlite3.connect('database/bingo.db')
+    c = conn.cursor()
+    
+    c.execute('''UPDATE game_sessions 
+                 SET status = 'ended', ended_at = ? 
+                 WHERE status IN ('waiting', 'countdown', 'active')''',
+              (datetime.now(),))
+    
+    c.execute('''UPDATE purchased_cards 
+                 SET status = 'released' 
+                 WHERE status = 'active' ''')
+    
+    released = c.rowcount
+    
+    session_id = str(uuid.uuid4())[:8]
+    c.execute('''INSERT INTO game_sessions 
+                 (session_id, game_type, card_price, status, house_fee) 
+                 VALUES (?, ?, ?, 'waiting', ?)''',
+              (session_id, settings['game_type'], settings['card_price'], 
+               settings.get('house_fee', 5)))
+    
+    conn.commit()
+    conn.close()
+    
+    log_admin_action(user['id'], 'new_round', f'Session {session_id} - Released {released} cards')
+    
+    return jsonify({
+        'success': True, 
+        'session_id': session_id,
+        'released_cards': released
+    })
 
 # ==================== ADMIN ROUTES ====================
 
@@ -1404,18 +1483,14 @@ def delete_user():
     if not admin_user or not admin_user['is_admin']:
         return jsonify({'success': False, 'error': 'Unauthorized'}), 403
     
-    # Don't allow deleting yourself
     if int(admin_id) == int(target_id):
         return jsonify({'success': False, 'error': 'Cannot delete yourself'}), 400
     
     conn = sqlite3.connect('database/bingo.db')
     c = conn.cursor()
     
-    # Delete user's transactions first
     c.execute("DELETE FROM transactions WHERE user_id IN (SELECT id FROM users WHERE telegram_id = ?)", (target_id,))
-    # Delete user's purchased cards
     c.execute("DELETE FROM purchased_cards WHERE user_id IN (SELECT id FROM users WHERE telegram_id = ?)", (target_id,))
-    # Delete user
     c.execute("DELETE FROM users WHERE telegram_id = ?", (target_id,))
     
     deleted = c.rowcount
