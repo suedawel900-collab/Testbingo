@@ -1,14 +1,12 @@
 import os
 import sqlite3
-import multiprocessing
+import threading
 import logging
 import time
 import json
 import uuid
-import fcntl
-import sys
 from datetime import datetime
-from flask import Flask, request, jsonify, render_template, session
+from flask import Flask, request, jsonify, render_template
 
 # Setup logging
 logging.basicConfig(
@@ -28,40 +26,9 @@ ADMIN_ID = int(os.environ.get('ADMIN_ID', '0'))
 RAILWAY_URL = os.environ.get('RAILWAY_STATIC_URL', 'localhost:5000')
 APP_URL = f"https://{RAILWAY_URL}"
 
-# IMPORTANT: Only run bot in the main process, not in Gunicorn workers
-IS_MAIN_PROCESS = os.environ.get('RUN_MAIN') == 'true' or not os.environ.get('GUNICORN_WORKER_ID')
-
 logger.info(f"Starting with BOT_TOKEN: {BOT_TOKEN[:5] if BOT_TOKEN else 'None'}...")
 logger.info(f"APP_URL: {APP_URL}")
-logger.info(f"IS_MAIN_PROCESS: {IS_MAIN_PROCESS}")
 logger.info(f"ADMIN_ID: {ADMIN_ID}")
-
-# ==================== LOCK FILE FOR BOT ====================
-LOCK_FILE = 'bot.lock'
-
-def acquire_lock():
-    """Acquire a lock file to ensure only one bot instance runs"""
-    try:
-        lock_file = open(LOCK_FILE, 'w')
-        fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        lock_file.write(str(os.getpid()))
-        lock_file.flush()
-        logger.info(f"Lock acquired by process {os.getpid()}")
-        return lock_file
-    except (IOError, OSError):
-        logger.error(f"Another bot instance is already running (lock file exists)")
-        return None
-
-def release_lock(lock_file):
-    """Release the lock file"""
-    if lock_file:
-        fcntl.flock(lock_file, fcntl.LOCK_UN)
-        lock_file.close()
-        try:
-            os.unlink(LOCK_FILE)
-        except:
-            pass
-        logger.info("Lock released")
 
 # ==================== DATABASE SETUP ====================
 def init_db():
@@ -108,7 +75,7 @@ def init_db():
                   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                   FOREIGN KEY (user_id) REFERENCES users(id))''')
     
-    # Game settings table with house fee
+    # Game settings table
     c.execute('''CREATE TABLE IF NOT EXISTS game_settings
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   game_type TEXT DEFAULT 'full house',
@@ -390,29 +357,23 @@ def get_game_stats():
     conn = sqlite3.connect('database/bingo.db')
     c = conn.cursor()
     
-    # Total users
     c.execute("SELECT COUNT(*) FROM users")
     total_users = c.fetchone()[0]
     
-    # Total transactions
     c.execute("SELECT COUNT(*), SUM(amount) FROM transactions WHERE status = 'approved'")
     row = c.fetchone()
     tx_count = row[0] or 0
     tx_total = row[1] or 0
     
-    # Total games played
     c.execute("SELECT SUM(games_played) FROM users")
     total_games = c.fetchone()[0] or 0
     
-    # Active game session
     c.execute("SELECT COUNT(*) FROM game_sessions WHERE status = 'active'")
     active_games = c.fetchone()[0]
     
-    # Pending transactions count
     c.execute("SELECT COUNT(*) FROM transactions WHERE status = 'pending'")
     pending_count = c.fetchone()[0]
     
-    # Total house collected
     c.execute("SELECT SUM(house_collected) FROM game_sessions")
     house_total = c.fetchone()[0] or 0
     
@@ -454,11 +415,10 @@ def create_game_session(settings):
     return session_id
 
 def end_game_session(session_id, winner_ids):
-    """End a game session, distribute prizes, and release cards for next round"""
+    """End a game session and distribute prizes"""
     conn = sqlite3.connect('database/bingo.db')
     c = conn.cursor()
     
-    # Get session details
     c.execute("SELECT total_cards_sold, card_price, house_fee FROM game_sessions WHERE session_id = ?", (session_id,))
     session = c.fetchone()
     
@@ -471,14 +431,12 @@ def end_game_session(session_id, winner_ids):
         winner_count = len(winner_ids)
         prize_per_winner = players_prize // winner_count if winner_count > 0 else 0
         
-        # Update session
         c.execute('''UPDATE game_sessions 
                      SET status = 'ended', ended_at = ?, 
                          prize_pool = ?, house_collected = ?
                      WHERE session_id = ?''',
                   (datetime.now(), total_prize, house_amount, session_id))
         
-        # Add to house fee history
         c.execute('''INSERT INTO house_fee_history 
                      (session_id, total_cards, card_price, total_prize, 
                       fee_percentage, house_amount, players_prize, winner_count) 
@@ -486,7 +444,6 @@ def end_game_session(session_id, winner_ids):
                   (session_id, total_cards, card_price, total_prize, 
                    house_fee, house_amount, players_prize, winner_count))
         
-        # Update winners' balances
         for winner_id in winner_ids:
             c.execute("SELECT id FROM users WHERE telegram_id = ?", (winner_id,))
             user_result = c.fetchone()
@@ -500,429 +457,59 @@ def end_game_session(session_id, winner_ids):
                              WHERE session_id = ? AND user_id = ?''',
                           (prize_per_winner, session_id, user_db_id))
         
-        # Release all cards for next round
+        # Release cards for next round
         c.execute('''UPDATE purchased_cards 
                      SET status = 'released' 
                      WHERE session_id = ?''', (session_id,))
         
         released_count = c.rowcount
-        logger.info(f"Released {released_count} cards from session {session_id} for next round")
-        logger.info(f"Game {session_id} ended. House: {house_amount} ETB, "
-                   f"Players: {players_prize} ETB split among {winner_count} winners")
+        logger.info(f"Released {released_count} cards from session {session_id}")
     
     conn.commit()
     conn.close()
     return released_count
 
-# ==================== CARD PURCHASE FUNCTIONS ====================
-def check_cards_available(card_numbers):
-    """Check if cards are available for purchase"""
-    conn = sqlite3.connect('database/bingo.db')
-    c = conn.cursor()
-    
-    placeholders = ','.join(['?'] * len(card_numbers))
-    c.execute(f"SELECT card_number FROM purchased_cards WHERE card_number IN ({placeholders}) AND status = 'active'", card_numbers)
-    purchased = [row[0] for row in c.fetchall()]
-    
-    conn.close()
-    return purchased
-
-def purchase_cards(user_id, card_numbers, session_id=None):
-    """Purchase multiple cards"""
-    conn = sqlite3.connect('database/bingo.db')
-    c = conn.cursor()
-    
-    success = []
-    failed = []
-    
-    for card in card_numbers:
-        try:
-            c.execute("INSERT INTO purchased_cards (card_number, user_id, session_id, status) VALUES (?, ?, ?, 'active')",
-                      (card, user_id, session_id))
-            success.append(card)
-        except sqlite3.IntegrityError:
-            failed.append(card)
-    
-    conn.commit()
-    conn.close()
-    
-    return success, failed
-
-def get_user_cards(user_id):
-    """Get all cards purchased by a user"""
-    conn = sqlite3.connect('database/bingo.db')
-    c = conn.cursor()
-    c.execute("SELECT card_number FROM purchased_cards WHERE user_id = ? AND status = 'active'", (user_id,))
-    cards = [row[0] for row in c.fetchall()]
-    conn.close()
-    return cards
-
-def get_all_purchased_cards():
-    """Get all purchased cards (for grid display)"""
-    conn = sqlite3.connect('database/bingo.db')
-    c = conn.cursor()
-    c.execute("SELECT card_number, user_id FROM purchased_cards WHERE status = 'active'")
-    cards = {row[0]: row[1] for row in c.fetchall()}
-    conn.close()
-    return cards
-
-# ==================== BOT PROCESS WITH LOCK ====================
-def run_bot_process():
-    """Run bot in a separate process with lock file"""
+# ==================== SIMPLE BOT WITH THREADING ====================
+def run_bot():
+    """Simple bot function that runs in a thread"""
     import asyncio
     from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
     from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler, ContextTypes
-    from telegram.error import Conflict
     
-    logger.info(f"Bot process started with PID: {os.getpid()}")
-    
-    # Try to acquire lock
-    lock_file = acquire_lock()
-    if not lock_file:
-        logger.error("Could not acquire lock - another bot instance is running")
+    if not BOT_TOKEN:
+        logger.error("No BOT_TOKEN")
         return
     
-    try:
-        # Database functions for bot process
-        def bot_get_user(telegram_id):
-            conn = sqlite3.connect('database/bingo.db')
-            c = conn.cursor()
-            c.execute("SELECT * FROM users WHERE telegram_id = ?", (telegram_id,))
-            user = c.fetchone()
-            conn.close()
-            return user
+    logger.info(f"Starting bot in thread...")
+    
+    async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        user = update.effective_user
+        logger.info(f"Start from {user.first_name}")
         
-        def bot_create_user(telegram_id, username, first_name):
-            conn = sqlite3.connect('database/bingo.db')
-            c = conn.cursor()
-            c.execute("INSERT OR IGNORE INTO users (telegram_id, username, first_name) VALUES (?, ?, ?)",
-                      (telegram_id, username, first_name))
-            conn.commit()
-            conn.close()
+        # Simple response without database for now
+        keyboard = [
+            [InlineKeyboardButton("🎮 PLAY BINGO", web_app={"url": f"{APP_URL}/game?user={user.id}"})]
+        ]
         
-        def bot_update_phone(telegram_id, phone_number):
-            conn = sqlite3.connect('database/bingo.db')
-            c = conn.cursor()
-            c.execute("UPDATE users SET phone_number = ? WHERE telegram_id = ?",
-                      (phone_number, telegram_id))
-            conn.commit()
-            conn.close()
-        
-        def bot_add_transaction(user_id, amount, tx_id):
-            conn = sqlite3.connect('database/bingo.db')
-            c = conn.cursor()
-            receipt_url = f"https://transactioninfo.ethiotelecom.et/receipt/{tx_id}"
-            c.execute("INSERT INTO transactions (user_id, amount, tx_id, receipt_url) VALUES (?, ?, ?, ?)",
-                      (user_id, amount, tx_id, receipt_url))
-            conn.commit()
-            conn.close()
-        
-        # ==================== BOT HANDLERS ====================
-        async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-            user = update.effective_user
-            logger.info(f"Start from {user.first_name} (ID: {user.id})")
-            
-            db_user = bot_get_user(user.id)
-            if not db_user:
-                bot_create_user(user.id, user.username, user.first_name)
-                db_user = bot_get_user(user.id)
-                
-                if not db_user:
-                    await update.message.reply_text("❌ Error creating user. Please try again.")
-                    return
-            
-            is_admin = False
-            if db_user and len(db_user) > 9:
-                is_admin = db_user[9] == 1
-                if is_admin:
-                    logger.info(f"✅ User {user.id} is an ADMIN")
-            
-            phone_number = db_user[8] if db_user and len(db_user) > 8 else None
-            
-            if not phone_number:
-                contact_keyboard = [
-                    [KeyboardButton("📱 Share Phone Number", request_contact=True)],
-                    [KeyboardButton("❌ Skip")]
-                ]
-                reply_markup = ReplyKeyboardMarkup(contact_keyboard, resize_keyboard=True, one_time_keyboard=True)
-                
-                await update.message.reply_text(
-                    "📱 Please share your phone number for verification:",
-                    reply_markup=reply_markup
-                )
-                return
-            
-            keyboard = [
-                [InlineKeyboardButton("🎮 PLAY BINGO", web_app={"url": f"{APP_URL}/game?user={user.id}"})],
-                [
-                    InlineKeyboardButton("💰 DEPOSIT", callback_data="deposit"),
-                    InlineKeyboardButton("📊 STATS", callback_data="stats")
-                ],
-                [InlineKeyboardButton("💳 BALANCE", callback_data="balance")]
-            ]
-            
-            if is_admin:
-                keyboard.append([InlineKeyboardButton("👑 ADMIN PANEL", web_app={"url": f"{APP_URL}/admin?user={user.id}"})])
-            
-            balance = db_user[4] if db_user and len(db_user) > 4 else 1000
-            
-            await update.message.reply_text(
-                f"🎰 Welcome to MK BINGO, {user.first_name}!\n"
-                f"💰 Balance: {balance} ETB",
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
-        
-        async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
-            contact = update.message.contact
-            user = update.effective_user
-            
-            if contact and contact.user_id == user.id:
-                bot_update_phone(user.id, contact.phone_number)
-                await update.message.reply_text(f"✅ Phone number saved!")
-                
-                db_user = bot_get_user(user.id)
-                is_admin = False
-                if db_user and len(db_user) > 9:
-                    is_admin = db_user[9] == 1
-                
-                balance = db_user[4] if db_user and len(db_user) > 4 else 1000
-                
-                keyboard = [
-                    [InlineKeyboardButton("🎮 PLAY BINGO", web_app={"url": f"{APP_URL}/game?user={user.id}"})],
-                    [
-                        InlineKeyboardButton("💰 DEPOSIT", callback_data="deposit"),
-                        InlineKeyboardButton("📊 STATS", callback_data="stats")
-                    ],
-                    [InlineKeyboardButton("💳 BALANCE", callback_data="balance")]
-                ]
-                
-                if is_admin:
-                    keyboard.append([InlineKeyboardButton("👑 ADMIN PANEL", web_app={"url": f"{APP_URL}/admin?user={user.id}"})])
-                
-                await update.message.reply_text(
-                    f"🎰 You can now play!",
-                    reply_markup=InlineKeyboardMarkup(keyboard)
-                )
-            else:
-                await update.message.reply_text("❌ Please share your own contact")
-        
-        async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-            query = update.callback_query
-            await query.answer()
-            
-            data = query.data
-            user = query.from_user
-            
-            if data == "balance":
-                db_user = bot_get_user(user.id)
-                balance = db_user[4] if db_user and len(db_user) > 4 else 1000
-                total_deposits = db_user[7] if db_user and len(db_user) > 7 else 0
-                
-                await query.edit_message_text(
-                    f"💳 *Your Balance*\n\n"
-                    f"Available: *{balance} ETB*\n"
-                    f"Total Deposits: *{total_deposits} ETB*",
-                    parse_mode='Markdown'
-                )
-            
-            elif data == "stats":
-                db_user = bot_get_user(user.id)
-                balance = db_user[4] if db_user and len(db_user) > 4 else 1000
-                games_played = db_user[5] if db_user and len(db_user) > 5 else 0
-                wins = db_user[6] if db_user and len(db_user) > 6 else 0
-                
-                await query.edit_message_text(
-                    f"📊 *Your Stats*\n\n"
-                    f"Balance: *{balance} ETB*\n"
-                    f"Games Played: *{games_played}*\n"
-                    f"Wins: *{wins} ETB*",
-                    parse_mode='Markdown'
-                )
-            
-            elif data == "deposit":
-                await query.edit_message_text(
-                    "💰 *Enter Deposit Amount*\n\n"
-                    "Please enter the amount you want to deposit (in ETB):\n"
-                    "Minimum: 50 ETB\n\n"
-                    "Example: `100`",
-                    parse_mode='Markdown'
-                )
-                context.user_data['awaiting_amount'] = True
-            
-            elif data.startswith("approve_"):
-                if user.id != ADMIN_ID:
-                    await query.edit_message_text("❌ Unauthorized")
-                    return
-                
-                tx_id = data.replace("approve_", "")
-                
-                conn = sqlite3.connect('database/bingo.db')
-                c = conn.cursor()
-                c.execute('''UPDATE transactions SET status='approved', approved_by=?, approved_at=? WHERE tx_id=?''',
-                          (ADMIN_ID, datetime.now(), tx_id))
-                c.execute("SELECT user_id, amount FROM transactions WHERE tx_id=?", (tx_id,))
-                result = c.fetchone()
-                if result:
-                    user_id, amount = result
-                    c.execute("UPDATE users SET balance=balance+?, total_deposits=total_deposits+? WHERE id=?", 
-                             (amount, amount, user_id))
-                    c.execute("SELECT telegram_id FROM users WHERE id=?", (user_id,))
-                    telegram_id = c.fetchone()[0]
-                    
-                    await context.bot.send_message(
-                        telegram_id, 
-                        f"✅ *Deposit Approved!*\n\n"
-                        f"Amount: *{amount} ETB*\n"
-                        f"Transaction ID: `{tx_id}`",
-                        parse_mode='Markdown'
-                    )
-                
-                conn.commit()
-                conn.close()
-                
-                await query.edit_message_text(
-                    f"✅ *Deposit Approved*",
-                    parse_mode='Markdown'
-                )
-            
-            elif data.startswith("reject_"):
-                if user.id != ADMIN_ID:
-                    await query.edit_message_text("❌ Unauthorized")
-                    return
-                
-                tx_id = data.replace("reject_", "")
-                
-                conn = sqlite3.connect('database/bingo.db')
-                c = conn.cursor()
-                c.execute("UPDATE transactions SET status='rejected' WHERE tx_id=?", (tx_id,))
-                conn.commit()
-                conn.close()
-                
-                await query.edit_message_text(f"❌ Deposit Rejected")
-        
-        async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-            user = update.effective_user
-            text = update.message.text.strip()
-            
-            if context.user_data.get('awaiting_amount'):
-                try:
-                    amount = int(text)
-                    if amount < 50:
-                        await update.message.reply_text("❌ Minimum deposit is 50 ETB")
-                        return
-                    
-                    context.user_data['deposit_amount'] = amount
-                    context.user_data['awaiting_amount'] = False
-                    context.user_data['awaiting_tx'] = True
-                    
-                    await update.message.reply_text(
-                        "💰 *Enter Transaction ID*\n\n"
-                        "Please send the Telebirr transaction ID you received:\n\n"
-                        "Example: `DC39E2J9ZP`",
-                        parse_mode='Markdown'
-                    )
-                    
-                except ValueError:
-                    await update.message.reply_text("❌ Please enter a valid number")
-            
-            elif context.user_data.get('awaiting_tx'):
-                tx_id = text.upper()
-                amount = context.user_data.get('deposit_amount')
-                
-                if not amount:
-                    await update.message.reply_text("❌ Please start over with /start")
-                    context.user_data.clear()
-                    return
-                
-                db_user = bot_get_user(user.id)
-                if not db_user:
-                    await update.message.reply_text("❌ User not found. Please use /start")
-                    return
-                
-                bot_add_transaction(db_user[0], amount, tx_id)
-                
-                keyboard = [[
-                    InlineKeyboardButton("✅ Approve", callback_data=f"approve_{tx_id}"),
-                    InlineKeyboardButton("❌ Reject", callback_data=f"reject_{tx_id}")
-                ]]
-                
-                receipt_url = f"https://transactioninfo.ethiotelecom.et/receipt/{tx_id}"
-                
-                await context.bot.send_message(
-                    ADMIN_ID,
-                    f"💰 *New Deposit Request*\n\n"
-                    f"👤 User: @{user.username or 'No username'}\n"
-                    f"🆔 ID: {user.id}\n"
-                    f"💳 Amount: *{amount} ETB*\n"
-                    f"🔑 TX ID: `{tx_id}`\n\n"
-                    f"[View Receipt]({receipt_url})",
-                    parse_mode='Markdown',
-                    reply_markup=InlineKeyboardMarkup(keyboard)
-                )
-                
-                await update.message.reply_text(
-                    f"✅ *Deposit Request Sent!*\n\n"
-                    f"Amount: *{amount} ETB*\n"
-                    f"Transaction ID: `{tx_id}`\n\n"
-                    f"Admin will approve within 5 minutes.",
-                    parse_mode='Markdown'
-                )
-                
-                context.user_data.clear()
-        
-        # Create and run application
-        bot_app = Application.builder().token(BOT_TOKEN).build()
-        bot_app.add_handler(CommandHandler("start", start))
-        bot_app.add_handler(CallbackQueryHandler(button_handler))
-        bot_app.add_handler(MessageHandler(filters.CONTACT, handle_contact))
-        bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
-        
-        logger.info("Bot process starting polling...")
-        bot_app.run_polling(drop_pending_updates=True)
-        
-    except Conflict as e:
-        logger.error(f"Conflict error - another bot instance is running: {e}")
-    except Exception as e:
-        logger.error(f"Bot process error: {e}")
-    finally:
-        release_lock(lock_file)
+        await update.message.reply_text(
+            f"🎰 Welcome to MK BINGO, {user.first_name}!",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    
+    # Create application
+    application = Application.builder().token(BOT_TOKEN).build()
+    application.add_handler(CommandHandler("start", start))
+    
+    logger.info("Bot started polling...")
+    application.run_polling(drop_pending_updates=True)
 
-# ==================== START BOT PROCESS ====================
-bot_process = None
-
-def start_bot_process():
-    """Start the bot in a separate process - ONLY ONCE"""
-    global bot_process
-    
-    if not IS_MAIN_PROCESS:
-        logger.info("Skipping bot start in Gunicorn worker")
-        return
-    
-    if bot_process and bot_process.is_alive():
-        logger.info("Bot process already running")
-        return
-    
-    # Kill any existing bot processes using the lock file
-    try:
-        if os.path.exists(LOCK_FILE):
-            with open(LOCK_FILE, 'r') as f:
-                old_pid = int(f.read().strip())
-            try:
-                os.kill(old_pid, 9)
-                logger.info(f"Killed old bot process {old_pid}")
-                time.sleep(1)
-            except:
-                pass
-            os.unlink(LOCK_FILE)
-    except:
-        pass
-    
-    bot_process = multiprocessing.Process(target=run_bot_process, daemon=True)
-    bot_process.start()
-    logger.info(f"Bot process started with PID: {bot_process.pid}")
-
-if BOT_TOKEN and IS_MAIN_PROCESS:
-    start_bot_process()
+# Start bot in a daemon thread
+if BOT_TOKEN:
+    bot_thread = threading.Thread(target=run_bot, daemon=True)
+    bot_thread.start()
+    logger.info("Bot thread started")
+else:
+    logger.error("BOT_TOKEN not set!")
 
 # ==================== FLASK ROUTES ====================
 
@@ -955,16 +542,25 @@ def get_user_data(telegram_id):
         })
     return jsonify({'success': False, 'error': 'Not found'}), 404
 
-# ==================== CARD PURCHASE API ====================
 @application.route('/api/cards/status')
 def get_card_status():
-    """Get status of all cards (which are purchased)"""
-    purchased = get_all_purchased_cards()
+    """Get status of all cards"""
+    purchased = {}
+    my_cards = []
+    
+    conn = sqlite3.connect('database/bingo.db')
+    c = conn.cursor()
+    c.execute("SELECT card_number, user_id FROM purchased_cards WHERE status = 'active'")
+    for row in c.fetchall():
+        purchased[row[0]] = row[1]
     
     user_id = request.args.get('user_id')
-    my_cards = []
     if user_id:
-        my_cards = get_user_cards(int(user_id))
+        c.execute("SELECT card_number FROM purchased_cards WHERE user_id = ? AND status = 'active'", 
+                  (get_user(int(user_id))['id'] if get_user(int(user_id)) else 0,))
+        my_cards = [row[0] for row in c.fetchall()]
+    
+    conn.close()
     
     return jsonify({
         'success': True,
@@ -973,79 +569,9 @@ def get_card_status():
         'my_cards': my_cards
     })
 
-@application.route('/api/cards/available')
-def get_available_cards():
-    """Get all available cards (not purchased in active session)"""
-    conn = sqlite3.connect('database/bingo.db')
-    c = conn.cursor()
-    
-    c.execute('''SELECT card_number FROM purchased_cards 
-                 WHERE status = 'active' AND session_id IN 
-                 (SELECT session_id FROM game_sessions WHERE status = 'active')
-                 ORDER BY card_number''')
-    
-    purchased_active = [row[0] for row in c.fetchall()]
-    conn.close()
-    
-    all_cards = set(range(1, 1001))
-    available = list(all_cards - set(purchased_active))
-    
-    return jsonify({
-        'success': True,
-        'available': available,
-        'active_purchased': purchased_active
-    })
-
-@application.route('/api/cards/purchase', methods=['POST'])
-def purchase_cards_api():
-    """Purchase multiple cards at once"""
-    data = request.json
-    user_id = data.get('user_id')
-    cards = data.get('cards', [])
-    total_price = data.get('total_price', 0)
-    
-    if not user_id or not cards:
-        return jsonify({'success': False, 'error': 'Missing data'}), 400
-    
-    conn = sqlite3.connect('database/bingo.db')
-    c = conn.cursor()
-    c.execute("SELECT session_id FROM game_sessions WHERE status = 'waiting' ORDER BY id DESC LIMIT 1")
-    session = c.fetchone()
-    session_id = session[0] if session else None
-    conn.close()
-    
-    conflicts = check_cards_available(cards)
-    if conflicts:
-        return jsonify({
-            'success': False,
-            'error': 'Some cards already purchased',
-            'conflicts': conflicts
-        }), 409
-    
-    success, failed = purchase_cards(user_id, cards, session_id)
-    
-    user = get_user(int(user_id))
-    if user and user['balance'] >= total_price:
-        conn = sqlite3.connect('database/bingo.db')
-        c = conn.cursor()
-        c.execute("UPDATE users SET balance = balance - ? WHERE telegram_id = ?", 
-                  (total_price, user_id))
-        conn.commit()
-        conn.close()
-    else:
-        return jsonify({'success': False, 'error': 'Insufficient balance'}), 400
-    
-    return jsonify({
-        'success': True,
-        'purchased': success,
-        'failed': failed
-    })
-
 @application.route('/api/game/session')
 def get_game_session():
     """Get current game session info"""
-    user_id = request.args.get('user_id')
-    
     conn = sqlite3.connect('database/bingo.db')
     c = conn.cursor()
     
@@ -1061,16 +587,6 @@ def get_game_session():
                      WHERE p.session_id = ?''', (session[0],))
         players = [{'id': row[0], 'name': row[1], 'cards': row[2]} for row in c.fetchall()]
         
-        in_game = False
-        my_cards = []
-        if user_id:
-            c.execute("SELECT cards FROM game_participants WHERE session_id = ? AND user_id = (SELECT id FROM users WHERE telegram_id = ?)", 
-                     (session[0], user_id))
-            result = c.fetchone()
-            if result:
-                in_game = True
-                my_cards = json.loads(result[0]) if result[0] else []
-        
         conn.close()
         return jsonify({
             'success': True,
@@ -1081,9 +597,7 @@ def get_game_session():
             'prize_pool': prize_pool,
             'status': session[4],
             'house_fee': session[5],
-            'players': players,
-            'in_game': in_game,
-            'my_cards': my_cards
+            'players': players
         })
     else:
         conn.close()
@@ -1092,8 +606,7 @@ def get_game_session():
             'total_cards_sold': 0,
             'total_players': 0,
             'prize_pool': 0,
-            'status': 'no_session',
-            'in_game': False
+            'status': 'no_session'
         })
 
 @application.route('/api/game/join', methods=['POST'])
@@ -1109,12 +622,11 @@ def join_game():
         return jsonify({'success': False, 'error': 'User not found'}), 404
     
     settings = get_game_settings()
-    card_price = settings['card_price']
     
     conn = sqlite3.connect('database/bingo.db')
     c = conn.cursor()
     
-    c.execute("SELECT id, session_id, total_cards_sold, total_players FROM game_sessions WHERE status = 'waiting' ORDER BY id DESC LIMIT 1")
+    c.execute("SELECT session_id FROM game_sessions WHERE status = 'waiting' ORDER BY id DESC LIMIT 1")
     session = c.fetchone()
     
     if not session:
@@ -1122,10 +634,9 @@ def join_game():
         c.execute('''INSERT INTO game_sessions 
                      (session_id, game_type, card_price, status, house_fee) 
                      VALUES (?, ?, ?, 'waiting', ?)''',
-                  (session_id, settings['game_type'], card_price, settings['house_fee']))
-        session_id = session_id
+                  (session_id, settings['game_type'], settings['card_price'], settings['house_fee']))
     else:
-        session_id = session[1]
+        session_id = session[0]
     
     c.execute('''INSERT INTO game_participants 
                  (session_id, user_id, cards, cards_bought, paid_amount) 
@@ -1139,466 +650,15 @@ def join_game():
               (len(cards), session_id))
     
     conn.commit()
-    
-    c.execute("SELECT total_cards_sold, total_players, card_price FROM game_sessions WHERE session_id = ?", (session_id,))
-    updated = c.fetchone()
-    
-    prize_pool = updated[0] * updated[2]
-    
     conn.close()
-    
-    return jsonify({
-        'success': True,
-        'session_id': session_id,
-        'total_cards_sold': updated[0],
-        'total_players': updated[1],
-        'prize_pool': prize_pool,
-        'game_ready': updated[0] >= settings['min_cards_to_start']
-    })
-
-@application.route('/api/game/end', methods=['POST'])
-def end_game():
-    """End the game and distribute prizes to winners ONLY"""
-    data = request.json
-    session_id = data.get('session_id')
-    winners = data.get('winners', [])
-    
-    if not session_id:
-        return jsonify({'success': False, 'error': 'Missing session_id'}), 400
-    
-    if not winners:
-        return jsonify({'success': False, 'error': 'No winners specified'}), 400
-    
-    end_game_session(session_id, winners)
-    
-    return jsonify({'success': True})
-
-@application.route('/api/game/new-round', methods=['POST'])
-def new_round():
-    """Start a new round - releases all previous cards"""
-    data = request.json
-    admin_id = data.get('admin_id')
-    
-    if not admin_id:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
-    
-    user = get_user(int(admin_id))
-    if not user or not user['is_admin']:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
-    
-    settings = get_game_settings()
-    
-    conn = sqlite3.connect('database/bingo.db')
-    c = conn.cursor()
-    
-    c.execute('''UPDATE game_sessions 
-                 SET status = 'ended', ended_at = ? 
-                 WHERE status IN ('waiting', 'countdown', 'active')''',
-              (datetime.now(),))
-    
-    c.execute('''UPDATE purchased_cards 
-                 SET status = 'released' 
-                 WHERE status = 'active' ''')
-    
-    released = c.rowcount
-    
-    session_id = str(uuid.uuid4())[:8]
-    c.execute('''INSERT INTO game_sessions 
-                 (session_id, game_type, card_price, status, house_fee) 
-                 VALUES (?, ?, ?, 'waiting', ?)''',
-              (session_id, settings['game_type'], settings['card_price'], 
-               settings.get('house_fee', 5)))
-    
-    conn.commit()
-    conn.close()
-    
-    log_admin_action(user['id'], 'new_round', f'Session {session_id} - Released {released} cards')
-    
-    return jsonify({
-        'success': True, 
-        'session_id': session_id,
-        'released_cards': released
-    })
-
-# ==================== ADMIN ROUTES ====================
-
-@application.route('/admin')
-def admin_panel():
-    """Admin panel page"""
-    user_id = request.args.get('user')
-    if not user_id:
-        return "Unauthorized - No user ID", 401
-    
-    user = get_user(int(user_id))
-    if not user:
-        return f"Unauthorized - User {user_id} not found", 401
-    
-    if not user['is_admin']:
-        return f"Unauthorized - User {user_id} is not admin", 401
-    
-    logger.info(f"Admin panel accessed by user {user_id}")
-    return render_template('admin.html', admin_id=user_id, admin_name=user['first_name'])
-
-@application.route('/api/admin/check/<int:telegram_id>')
-def check_admin(telegram_id):
-    """Check if user is admin"""
-    user = get_user(telegram_id)
-    if user and user['is_admin']:
-        return jsonify({'success': True, 'is_admin': True})
-    return jsonify({'success': False, 'is_admin': False}), 403
-
-@application.route('/api/admin/stats')
-def admin_stats():
-    """Get admin statistics"""
-    admin_id = request.args.get('admin_id')
-    if not admin_id:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
-    
-    user = get_user(int(admin_id))
-    if not user or not user['is_admin']:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
-    
-    stats = get_game_stats()
-    settings = get_game_settings()
-    
-    return jsonify({
-        'success': True,
-        'stats': stats,
-        'settings': settings
-    })
-
-@application.route('/api/admin/users')
-def admin_users():
-    """Get all users"""
-    admin_id = request.args.get('admin_id')
-    if not admin_id:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
-    
-    user = get_user(int(admin_id))
-    if not user or not user['is_admin']:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
-    
-    users = get_all_users()
-    return jsonify({'success': True, 'users': users})
-
-@application.route('/api/admin/transactions')
-def admin_transactions():
-    """Get pending transactions"""
-    admin_id = request.args.get('admin_id')
-    if not admin_id:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
-    
-    user = get_user(int(admin_id))
-    if not user or not user['is_admin']:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
-    
-    transactions = get_pending_transactions()
-    return jsonify({'success': True, 'transactions': transactions})
-
-@application.route('/api/admin/update-settings', methods=['POST'])
-def update_settings():
-    """Update game settings"""
-    data = request.json
-    admin_id = data.get('admin_id')
-    
-    if not admin_id:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
-    
-    user = get_user(int(admin_id))
-    if not user or not user['is_admin']:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
-    
-    settings = {
-        'game_type': data.get('game_type', 'full house'),
-        'card_price': int(data.get('card_price', 10)),
-        'min_cards_to_start': int(data.get('min_cards_to_start', 10)),
-        'call_interval': int(data.get('call_interval', 3)),
-        'house_fee': float(data.get('house_fee', 5))
-    }
-    
-    update_game_settings(user['id'], settings)
-    
-    return jsonify({'success': True})
-
-@application.route('/api/admin/approve-transaction', methods=['POST'])
-def admin_approve_transaction():
-    """Approve a transaction"""
-    data = request.json
-    admin_id = data.get('admin_id')
-    tx_id = data.get('tx_id')
-    
-    if not admin_id or not tx_id:
-        return jsonify({'success': False, 'error': 'Missing data'}), 400
-    
-    user = get_user(int(admin_id))
-    if not user or not user['is_admin']:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
-    
-    telegram_id, amount = approve_transaction(tx_id, user['id'])
-    
-    if telegram_id:
-        log_admin_action(user['id'], 'approve_transaction', f'{amount} ETB for {telegram_id}')
-        return jsonify({
-            'success': True,
-            'message': f'Approved {amount} ETB for user {telegram_id}'
-        })
-    else:
-        return jsonify({'success': False, 'error': 'Transaction not found'})
-
-@application.route('/api/admin/reject-transaction', methods=['POST'])
-def admin_reject_transaction():
-    """Reject a transaction"""
-    data = request.json
-    admin_id = data.get('admin_id')
-    tx_id = data.get('tx_id')
-    
-    if not admin_id or not tx_id:
-        return jsonify({'success': False, 'error': 'Missing data'}), 400
-    
-    user = get_user(int(admin_id))
-    if not user or not user['is_admin']:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
-    
-    conn = sqlite3.connect('database/bingo.db')
-    c = conn.cursor()
-    c.execute("UPDATE transactions SET status='rejected' WHERE tx_id=?", (tx_id,))
-    conn.commit()
-    conn.close()
-    
-    log_admin_action(user['id'], 'reject_transaction', tx_id)
-    
-    return jsonify({'success': True})
-
-@application.route('/api/admin/update-balance', methods=['POST'])
-def admin_update_balance():
-    """Manually update user balance"""
-    data = request.json
-    admin_id = data.get('admin_id')
-    target_id = data.get('target_id')
-    amount = int(data.get('amount', 0))
-    operation = data.get('operation', 'add')
-    
-    if not admin_id or not target_id:
-        return jsonify({'success': False, 'error': 'Missing data'}), 400
-    
-    user = get_user(int(admin_id))
-    if not user or not user['is_admin']:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
-    
-    conn = sqlite3.connect('database/bingo.db')
-    c = conn.cursor()
-    
-    if operation == 'add':
-        c.execute("UPDATE users SET balance = balance + ? WHERE telegram_id = ?", 
-                  (amount, target_id))
-    else:
-        c.execute("UPDATE users SET balance = balance - ? WHERE telegram_id = ?", 
-                  (amount, target_id))
-    
-    c.execute("SELECT balance FROM users WHERE telegram_id = ?", (target_id,))
-    new_balance = c.fetchone()[0]
-    conn.commit()
-    conn.close()
-    
-    log_admin_action(user['id'], f'update_balance_{operation}', f'{target_id}: {amount} ETB')
-    
-    return jsonify({'success': True, 'new_balance': new_balance})
-
-@application.route('/api/admin/set-admin', methods=['POST'])
-def set_admin():
-    """Set or remove admin status for a user"""
-    data = request.json
-    admin_id = data.get('admin_id')
-    target_id = data.get('target_id')
-    is_admin = data.get('is_admin', 0)
-    
-    if not admin_id or not target_id:
-        return jsonify({'success': False, 'error': 'Missing data'}), 400
-    
-    admin_user = get_user(int(admin_id))
-    if not admin_user or not admin_user['is_admin']:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
-    
-    conn = sqlite3.connect('database/bingo.db')
-    c = conn.cursor()
-    c.execute("UPDATE users SET is_admin = ? WHERE telegram_id = ?", (is_admin, target_id))
-    conn.commit()
-    conn.close()
-    
-    log_admin_action(admin_user['id'], 'set_admin', f'{target_id} -> {is_admin}')
-    
-    return jsonify({'success': True})
-
-@application.route('/api/admin/add-user', methods=['POST'])
-def add_user():
-    """Add a new user manually"""
-    data = request.json
-    admin_id = data.get('admin_id')
-    telegram_id = data.get('telegram_id')
-    username = data.get('username', '')
-    first_name = data.get('first_name', 'New User')
-    phone = data.get('phone', '')
-    balance = data.get('balance', 1000)
-    is_admin = data.get('is_admin', 0)
-    
-    if not admin_id or not telegram_id:
-        return jsonify({'success': False, 'error': 'Missing data'}), 400
-    
-    admin_user = get_user(int(admin_id))
-    if not admin_user or not admin_user['is_admin']:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
-    
-    conn = sqlite3.connect('database/bingo.db')
-    c = conn.cursor()
-    
-    try:
-        c.execute('''INSERT INTO users 
-                     (telegram_id, username, first_name, phone_number, balance, is_admin) 
-                     VALUES (?, ?, ?, ?, ?, ?)''',
-                  (telegram_id, username, first_name, phone, balance, is_admin))
-        conn.commit()
-        success = True
-    except sqlite3.IntegrityError:
-        success = False
-    finally:
-        conn.close()
-    
-    if success:
-        log_admin_action(admin_user['id'], 'add_user', f'{telegram_id} - {first_name}')
-        return jsonify({'success': True})
-    else:
-        return jsonify({'success': False, 'error': 'User already exists'})
-
-@application.route('/api/admin/delete-user', methods=['POST'])
-def delete_user():
-    """Delete a user"""
-    data = request.json
-    admin_id = data.get('admin_id')
-    target_id = data.get('target_id')
-    
-    if not admin_id or not target_id:
-        return jsonify({'success': False, 'error': 'Missing data'}), 400
-    
-    admin_user = get_user(int(admin_id))
-    if not admin_user or not admin_user['is_admin']:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
-    
-    if int(admin_id) == int(target_id):
-        return jsonify({'success': False, 'error': 'Cannot delete yourself'}), 400
-    
-    conn = sqlite3.connect('database/bingo.db')
-    c = conn.cursor()
-    
-    c.execute("DELETE FROM transactions WHERE user_id IN (SELECT id FROM users WHERE telegram_id = ?)", (target_id,))
-    c.execute("DELETE FROM purchased_cards WHERE user_id IN (SELECT id FROM users WHERE telegram_id = ?)", (target_id,))
-    c.execute("DELETE FROM users WHERE telegram_id = ?", (target_id,))
-    
-    deleted = c.rowcount
-    conn.commit()
-    conn.close()
-    
-    if deleted:
-        log_admin_action(admin_user['id'], 'delete_user', f'{target_id}')
-        return jsonify({'success': True})
-    else:
-        return jsonify({'success': False, 'error': 'User not found'})
-
-@application.route('/api/admin/start-game', methods=['POST'])
-def admin_start_game():
-    """Start a new game session"""
-    data = request.json
-    admin_id = data.get('admin_id')
-    
-    if not admin_id:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
-    
-    user = get_user(int(admin_id))
-    if not user or not user['is_admin']:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
-    
-    settings = get_game_settings()
-    session_id = create_game_session(settings)
-    
-    log_admin_action(user['id'], 'start_game', session_id)
     
     return jsonify({'success': True, 'session_id': session_id})
 
-@application.route('/api/admin/logs')
-def admin_logs():
-    """Get admin action logs"""
-    admin_id = request.args.get('admin_id')
-    
-    if not admin_id:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
-    
-    user = get_user(int(admin_id))
-    if not user or not user['is_admin']:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
-    
-    conn = sqlite3.connect('database/bingo.db')
-    c = conn.cursor()
-    c.execute('''SELECT l.created_at, u.username, l.action, l.details 
-                 FROM admin_logs l
-                 JOIN users u ON l.admin_id = u.id
-                 ORDER BY l.created_at DESC LIMIT 50''')
-    logs = c.fetchall()
-    conn.close()
-    
-    result = []
-    for l in logs:
-        result.append({
-            'time': l[0],
-            'admin': l[1],
-            'action': l[2],
-            'details': l[3]
-        })
-    
-    return jsonify({'success': True, 'logs': result})
-
-@application.route('/api/admin/house-history')
-def house_fee_history():
-    """Get house fee history"""
-    admin_id = request.args.get('admin_id')
-    
-    if not admin_id:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
-    
-    user = get_user(int(admin_id))
-    if not user or not user['is_admin']:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
-    
-    conn = sqlite3.connect('database/bingo.db')
-    c = conn.cursor()
-    c.execute('''SELECT session_id, total_cards, card_price, total_prize, fee_percentage, house_amount, players_prize, winner_count, game_date 
-                 FROM house_fee_history ORDER BY game_date DESC LIMIT 20''')
-    history = c.fetchall()
-    conn.close()
-    
-    result = []
-    for h in history:
-        result.append({
-            'session_id': h[0],
-            'total_cards': h[1],
-            'card_price': h[2],
-            'total_prize': h[3],
-            'fee_percentage': h[4],
-            'house_amount': h[5],
-            'players_prize': h[6],
-            'winner_count': h[7],
-            'game_date': h[8]
-        })
-    
-    return jsonify({'success': True, 'history': result})
-
-# Health check
 @application.route('/health')
 def health():
     return jsonify({
         'status': 'ok',
-        'bot_process': bot_process.is_alive() if bot_process else False,
-        'is_main_process': IS_MAIN_PROCESS,
-        'admin_id': ADMIN_ID,
-        'admin_configured': ADMIN_ID != 0,
+        'bot_token_configured': bool(BOT_TOKEN),
         'url': APP_URL
     })
 
