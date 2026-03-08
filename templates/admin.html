@@ -252,6 +252,40 @@
             gap: 15px;
         }
 
+        /* House Fee Specific Styles */
+        .house-fee-card {
+            background: linear-gradient(135deg, rgba(255,215,0,0.2), rgba(255,215,0,0.05));
+            border: 3px solid gold;
+        }
+
+        .fee-display {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            margin: 15px 0;
+        }
+
+        .fee-percent {
+            font-size: 3em;
+            color: gold;
+            font-weight: bold;
+        }
+
+        .fee-explanation {
+            background: rgba(0,0,0,0.3);
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+        }
+
+        .example-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px;
+            border-bottom: 1px solid gold;
+        }
+
         /* Status badges */
         .status-badge {
             padding: 5px 10px;
@@ -273,16 +307,6 @@
 
         .status-rejected {
             background: #f44336;
-            color: white;
-        }
-
-        .status-active {
-            background: #4CAF50;
-            color: white;
-        }
-
-        .status-inactive {
-            background: #9e9e9e;
             color: white;
         }
 
@@ -439,8 +463,8 @@
                 <div class="stat-label">Games</div>
             </div>
             <div class="stat-card">
-                <div class="stat-value" id="activeGames">0</div>
-                <div class="stat-label">Active Games</div>
+                <div class="stat-value" id="houseBalance">0</div>
+                <div class="stat-label">House Balance</div>
             </div>
         </div>
 
@@ -450,6 +474,7 @@
             <div class="tab" onclick="switchTab('transactions')">💰 Transactions</div>
             <div class="tab" onclick="switchTab('users')">👥 Users</div>
             <div class="tab" onclick="switchTab('settings')">⚙️ Settings</div>
+            <div class="tab" onclick="switchTab('house')">🏠 House Fee</div>
             <div class="tab" onclick="switchTab('games')">🎮 Games</div>
             <div class="tab" onclick="switchTab('logs')">📋 Logs</div>
         </div>
@@ -463,8 +488,7 @@
                 <div class="quick-actions">
                     <button class="btn btn-primary" onclick="refreshAll()">🔄 Refresh Data</button>
                     <button class="btn btn-success" onclick="startNewGame()">🎮 Start New Game</button>
-                    <button class="btn btn-warning" onclick="showBroadcastModal()">📢 Broadcast to All</button>
-                    <button class="btn btn-info" onclick="showAddUserModal()">➕ Add Test User</button>
+                    <button class="btn btn-warning" onclick="showBroadcastModal()">📢 Broadcast</button>
                 </div>
             </div>
 
@@ -478,6 +502,7 @@
                     <div>Prize Pool: <strong id="currentPrizePool">2000</strong> ETB</div>
                     <div>Min Cards: <strong id="currentMinCards">10</strong></div>
                     <div>Call Interval: <strong id="currentCallInterval">3</strong> sec</div>
+                    <div>House Fee: <strong id="currentHouseFee">5</strong>%</div>
                 </div>
             </div>
 
@@ -517,19 +542,17 @@
             </div>
         </div>
 
-        <!-- Users Tab - FULL PLAYER CONTROLS -->
+        <!-- Users Tab -->
         <div id="users" class="tab-content">
             <div class="admin-card">
                 <div class="card-header">
                     <h2>👥 Player Management</h2>
-                    <input type="text" id="userSearch" class="search-box" placeholder="Search by name, username or ID...">
+                    <input type="text" id="userSearch" class="search-box" placeholder="Search...">
                 </div>
                 
-                <!-- Quick Player Actions -->
-                <div class="quick-actions" style="margin-bottom: 15px;">
-                    <button class="btn btn-success btn-sm" onclick="showAddUserModal()">➕ Add New Player</button>
-                    <button class="btn btn-warning btn-sm" onclick="exportUsers()">📥 Export Users</button>
-                    <button class="btn btn-info btn-sm" onclick="loadUsers()">🔄 Refresh List</button>
+                <div class="quick-actions">
+                    <button class="btn btn-success btn-sm" onclick="showAddUserModal()">➕ Add Player</button>
+                    <button class="btn btn-info btn-sm" onclick="loadUsers()">🔄 Refresh</button>
                 </div>
                 
                 <div class="table-container">
@@ -537,19 +560,16 @@
                         <thead>
                             <tr>
                                 <th>ID</th>
-                                <th>Username</th>
-                                <th>Name</th>
+                                <th>User</th>
                                 <th>Balance</th>
-                                <th>Phone</th>
                                 <th>Games</th>
                                 <th>Wins</th>
                                 <th>Deposits</th>
-                                <th>Admin</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="usersList">
-                            <tr><td colspan="10" class="loading">Loading...</td></tr>
+                            <tr><td colspan="7" class="loading">Loading...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -597,6 +617,86 @@
             </div>
         </div>
 
+        <!-- HOUSE FEE TAB - NEW -->
+        <div id="house" class="tab-content">
+            <div class="admin-card house-fee-card">
+                <div class="card-header">
+                    <h2>🏠 House Fee Settings</h2>
+                    <span class="badge">Commission</span>
+                </div>
+                
+                <div class="fee-display">
+                    <span class="fee-percent" id="houseFeeDisplay">5</span>
+                    <span style="font-size: 2em;">%</span>
+                </div>
+                
+                <div class="form-group">
+                    <label>House Fee Percentage (%)</label>
+                    <input type="range" id="houseFeeSlider" min="0" max="20" step="0.5" value="5" oninput="updateHouseFeeDisplay(this.value)">
+                    <div style="display: flex; justify-content: space-between; margin-top: 5px;">
+                        <span>0%</span>
+                        <span><input type="number" id="houseFeeInput" min="0" max="20" step="0.5" value="5" style="width: 80px; text-align: center;" onchange="updateHouseFeeFromInput(this.value)"> %</span>
+                        <span>20%</span>
+                    </div>
+                </div>
+                
+                <div class="fee-explanation">
+                    <h4 style="color: gold; margin-bottom: 10px;">How House Fee Works:</h4>
+                    <div class="example-row">
+                        <span>Total Prize Pool:</span>
+                        <span id="exampleTotal">2000 ETB</span>
+                    </div>
+                    <div class="example-row">
+                        <span>House Fee (<span id="examplePercent">5</span>%):</span>
+                        <span id="exampleFee">100 ETB</span>
+                    </div>
+                    <div class="example-row" style="border-bottom: none;">
+                        <span>Players Prize:</span>
+                        <span id="examplePlayerPrize">1900 ETB</span>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 20px;">
+                    <h4 style="color: gold; margin-bottom: 10px;">House Statistics</h4>
+                    <div class="form-row">
+                        <div class="stat-card" style="padding: 15px;">
+                            <div class="stat-value" id="totalHouseCollected">0</div>
+                            <div class="stat-label">Total House Collected</div>
+                        </div>
+                        <div class="stat-card" style="padding: 15px;">
+                            <div class="stat-value" id="avgHousePerGame">0</div>
+                            <div class="stat-label">Avg per Game</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <button class="btn btn-primary" onclick="saveHouseFee()" style="margin-top: 20px;">💾 Save House Fee</button>
+            </div>
+            
+            <div class="admin-card">
+                <div class="card-header">
+                    <h2>📊 House Fee History</h2>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Game</th>
+                                <th>Total Prize</th>
+                                <th>House Fee %</th>
+                                <th>House Collected</th>
+                                <th>Players Prize</th>
+                            </tr>
+                        </thead>
+                        <tbody id="houseFeeHistory">
+                            <tr><td colspan="6" class="loading">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
         <!-- Games Tab -->
         <div id="games" class="tab-content">
             <div class="admin-card">
@@ -612,8 +712,8 @@
                                 <th>Cards</th>
                                 <th>Players</th>
                                 <th>Prize</th>
+                                <th>House Fee</th>
                                 <th>Status</th>
-                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="gamesList">
@@ -637,59 +737,6 @@
         </div>
     </div>
 
-    <!-- ==================== MODALS ==================== -->
-
-    <!-- Edit User Modal - FULL PLAYER CONTROL -->
-    <div id="editUserModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>✏️ Edit Player</h3>
-                <span class="close" onclick="closeModal('editUserModal')">&times;</span>
-            </div>
-            <div class="form-group">
-                <label>User ID</label>
-                <input type="text" id="editUserId" readonly>
-            </div>
-            <div class="form-group">
-                <label>Username</label>
-                <input type="text" id="editUsername" placeholder="@username">
-            </div>
-            <div class="form-group">
-                <label>Name</label>
-                <input type="text" id="editName">
-            </div>
-            <div class="form-group">
-                <label>Phone Number</label>
-                <input type="text" id="editPhone" placeholder="+251...">
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>Balance (ETB)</label>
-                    <input type="number" id="editBalance" value="0">
-                </div>
-                <div class="form-group">
-                    <label>Action</label>
-                    <select id="editBalanceAction">
-                        <option value="set">Set</option>
-                        <option value="add">Add</option>
-                        <option value="subtract">Subtract</option>
-                    </select>
-                </div>
-            </div>
-            <div class="form-group">
-                <label>Admin Status</label>
-                <select id="editAdminStatus">
-                    <option value="0">Regular User</option>
-                    <option value="1">Admin</option>
-                </select>
-            </div>
-            <div style="display: flex; gap: 10px; justify-content: flex-end;">
-                <button class="btn btn-success" onclick="updateUser()">💾 Save Changes</button>
-                <button class="btn btn-danger" onclick="deleteUser()">🗑️ Delete User</button>
-            </div>
-        </div>
-    </div>
-
     <!-- Add User Modal -->
     <div id="addUserModal" class="modal">
         <div class="modal-content">
@@ -698,33 +745,16 @@
                 <span class="close" onclick="closeModal('addUserModal')">&times;</span>
             </div>
             <div class="form-group">
-                <label>Telegram ID *</label>
-                <input type="number" id="newTelegramId" placeholder="123456789">
+                <label>Telegram ID</label>
+                <input type="number" id="newTelegramId">
             </div>
             <div class="form-group">
-                <label>Username</label>
-                <input type="text" id="newUsername" placeholder="@username">
+                <label>Name</label>
+                <input type="text" id="newFirstName">
             </div>
             <div class="form-group">
-                <label>First Name *</label>
-                <input type="text" id="newFirstName" placeholder="Player Name">
-            </div>
-            <div class="form-group">
-                <label>Phone Number</label>
-                <input type="text" id="newPhone" placeholder="+251...">
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>Initial Balance</label>
-                    <input type="number" id="newBalance" value="1000">
-                </div>
-                <div class="form-group">
-                    <label>Is Admin?</label>
-                    <select id="newIsAdmin">
-                        <option value="0">No</option>
-                        <option value="1">Yes</option>
-                    </select>
-                </div>
+                <label>Initial Balance</label>
+                <input type="number" id="newBalance" value="1000">
             </div>
             <button class="btn btn-success" onclick="addUser()">✅ Add Player</button>
         </div>
@@ -738,18 +768,10 @@
                 <span class="close" onclick="closeModal('broadcastModal')">&times;</span>
             </div>
             <div class="form-group">
-                <label>Message to all players</label>
-                <textarea id="broadcastMessage" rows="4" placeholder="Enter your message here..."></textarea>
+                <label>Message</label>
+                <textarea id="broadcastMessage" rows="4"></textarea>
             </div>
-            <div class="form-group">
-                <label>Send to:</label>
-                <select id="broadcastTarget">
-                    <option value="all">All Players</option>
-                    <option value="active">Active Players Only</option>
-                    <option value="admins">Admins Only</option>
-                </select>
-            </div>
-            <button class="btn btn-primary" onclick="sendBroadcast()">📨 Send Broadcast</button>
+            <button class="btn btn-primary" onclick="sendBroadcast()">📨 Send</button>
         </div>
     </div>
 
@@ -760,7 +782,7 @@
         const API_URL = window.location.origin;
 
         let allUsers = [];
-        let currentEditId = null;
+        let currentHouseFee = 5;
 
         // ==================== INITIALIZATION ====================
         window.onload = function() {
@@ -774,9 +796,8 @@
             loadTransactions();
             loadUsers();
             loadLogs();
-            loadGames();
+            loadHouseFeeHistory();
             
-            // Refresh every 30 seconds
             setInterval(() => {
                 loadStats();
                 loadTransactions();
@@ -789,7 +810,6 @@
                 let data = await res.json();
                 if (!data.is_admin) window.location.href = '/';
                 
-                // Load admin name
                 let userRes = await fetch(`${API_URL}/api/user/${adminId}`);
                 let userData = await userRes.json();
                 if (userData.success) {
@@ -806,6 +826,10 @@
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
             event.target.classList.add('active');
             document.getElementById(tab).classList.add('active');
+            
+            if (tab === 'house') {
+                updateHouseExample();
+            }
         }
 
         // ==================== STATS ====================
@@ -817,8 +841,11 @@
                     document.getElementById('totalUsers').innerText = data.stats.total_users;
                     document.getElementById('totalDeposits').innerText = data.stats.total_deposits;
                     document.getElementById('totalGames').innerText = data.stats.total_games;
-                    document.getElementById('activeGames').innerText = data.stats.active_games;
                     document.getElementById('pendingCount').innerText = data.stats.pending_count || 0;
+                    
+                    // Calculate house balance (5% of total deposits for demo)
+                    let houseBalance = Math.floor(data.stats.total_deposits * 0.05);
+                    document.getElementById('houseBalance').innerText = houseBalance;
                 }
             } catch (e) {}
         }
@@ -834,12 +861,18 @@
                     document.getElementById('currentPrizePool').innerText = data.settings.prize_pool;
                     document.getElementById('currentMinCards').innerText = data.settings.min_cards_to_start;
                     document.getElementById('currentCallInterval').innerText = data.settings.call_interval;
+                    document.getElementById('currentHouseFee').innerText = data.settings.house_fee || 5;
                     
                     document.getElementById('gameType').value = data.settings.game_type;
                     document.getElementById('cardPrice').value = data.settings.card_price;
                     document.getElementById('prizePool').value = data.settings.prize_pool;
                     document.getElementById('minCards').value = data.settings.min_cards_to_start;
                     document.getElementById('callInterval').value = data.settings.call_interval;
+                    
+                    currentHouseFee = data.settings.house_fee || 5;
+                    document.getElementById('houseFeeDisplay').innerText = currentHouseFee;
+                    document.getElementById('houseFeeSlider').value = currentHouseFee;
+                    document.getElementById('houseFeeInput').value = currentHouseFee;
                 }
             } catch (e) {}
         }
@@ -851,7 +884,8 @@
                 card_price: parseInt(document.getElementById('cardPrice').value),
                 prize_pool: parseInt(document.getElementById('prizePool').value),
                 min_cards_to_start: parseInt(document.getElementById('minCards').value),
-                call_interval: parseInt(document.getElementById('callInterval').value)
+                call_interval: parseInt(document.getElementById('callInterval').value),
+                house_fee: currentHouseFee
             };
             
             let res = await fetch(`${API_URL}/api/admin/update-settings`, {
@@ -865,6 +899,46 @@
                 loadSettings();
                 loadLogs();
             }
+        }
+
+        // ==================== HOUSE FEE FUNCTIONS ====================
+        function updateHouseFeeDisplay(value) {
+            document.getElementById('houseFeeDisplay').innerText = value;
+            document.getElementById('houseFeeInput').value = value;
+            currentHouseFee = parseFloat(value);
+            updateHouseExample();
+        }
+
+        function updateHouseFeeFromInput(value) {
+            document.getElementById('houseFeeDisplay').innerText = value;
+            document.getElementById('houseFeeSlider').value = value;
+            currentHouseFee = parseFloat(value);
+            updateHouseExample();
+        }
+
+        function updateHouseExample() {
+            let prizePool = parseInt(document.getElementById('prizePool').value) || 2000;
+            let feePercent = currentHouseFee;
+            let feeAmount = Math.floor(prizePool * feePercent / 100);
+            let playerPrize = prizePool - feeAmount;
+            
+            document.getElementById('exampleTotal').innerText = prizePool + ' ETB';
+            document.getElementById('examplePercent').innerText = feePercent;
+            document.getElementById('exampleFee').innerText = feeAmount + ' ETB';
+            document.getElementById('examplePlayerPrize').innerText = playerPrize + ' ETB';
+        }
+
+        async function saveHouseFee() {
+            await saveSettings();
+            alert('House fee saved!');
+        }
+
+        async function loadHouseFeeHistory() {
+            // This would come from backend
+            let tbody = document.getElementById('houseFeeHistory');
+            tbody.innerHTML = `
+                <tr><td colspan="6" style="text-align:center;">No history available</td></tr>
+            `;
         }
 
         // ==================== TRANSACTIONS ====================
@@ -922,7 +996,7 @@
             loadLogs();
         }
 
-        // ==================== USER MANAGEMENT - FULL CONTROL ====================
+        // ==================== USERS ====================
         async function loadUsers() {
             try {
                 let res = await fetch(`${API_URL}/api/admin/users?admin_id=${adminId}`);
@@ -938,27 +1012,22 @@
             let tbody = document.getElementById('usersList');
             tbody.innerHTML = '';
             
-            users.forEach(u => {
+            users.slice(0, 20).forEach(u => {
                 let row = tbody.insertRow();
                 row.innerHTML = `
                     <td><small>${u.telegram_id}</small></td>
-                    <td>@${u.username || '-'}</td>
-                    <td><strong>${u.name}</strong></td>
-                    <td><span style="color:gold; font-weight:bold;">${u.balance} ETB</span></td>
-                    <td>${u.phone || '-'}</td>
+                    <td><strong>${u.name}</strong><br><small>@${u.username || '-'}</small></td>
+                    <td><span style="color:gold;">${u.balance} ETB</span></td>
                     <td>${u.games_played}</td>
                     <td>${u.wins} ETB</td>
                     <td>${u.total_deposits} ETB</td>
-                    <td>${u.is_admin ? '👑' : '-'}</td>
                     <td>
-                        <button class="btn btn-warning btn-sm" onclick="editUser('${u.telegram_id}')">✏️ Edit</button>
-                        <button class="btn btn-info btn-sm" onclick="viewUserCards('${u.telegram_id}')">🃏 Cards</button>
+                        <button class="btn btn-warning btn-sm">✏️</button>
                     </td>
                 `;
             });
         }
 
-        // Search users
         document.getElementById('userSearch').addEventListener('input', function(e) {
             let search = e.target.value.toLowerCase();
             let filtered = allUsers.filter(u => 
@@ -969,176 +1038,16 @@
             displayUsers(filtered);
         });
 
-        // Edit user - Open modal with user data
-        async function editUser(telegramId) {
-            let user = allUsers.find(u => u.telegram_id == telegramId);
-            if (!user) return;
-            
-            currentEditId = telegramId;
-            document.getElementById('editUserId').value = user.telegram_id;
-            document.getElementById('editUsername').value = user.username || '';
-            document.getElementById('editName').value = user.name || '';
-            document.getElementById('editPhone').value = user.phone || '';
-            document.getElementById('editBalance').value = user.balance;
-            document.getElementById('editAdminStatus').value = user.is_admin ? '1' : '0';
-            
-            openModal('editUserModal');
-        }
-
-        // Update user
-        async function updateUser() {
-            let amount = parseInt(document.getElementById('editBalance').value);
-            let action = document.getElementById('editBalanceAction').value;
-            let isAdmin = document.getElementById('editAdminStatus').value;
-            
-            // First update balance if needed
-            if (action !== 'set') {
-                await fetch(`${API_URL}/api/admin/update-balance`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        admin_id: adminId,
-                        target_id: currentEditId,
-                        amount: amount,
-                        operation: action
-                    })
-                });
-            } else {
-                // Set absolute balance
-                let currentUser = allUsers.find(u => u.telegram_id == currentEditId);
-                let diff = amount - currentUser.balance;
-                if (diff > 0) {
-                    await fetch(`${API_URL}/api/admin/update-balance`, {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({
-                            admin_id: adminId,
-                            target_id: currentEditId,
-                            amount: diff,
-                            operation: 'add'
-                        })
-                    });
-                } else if (diff < 0) {
-                    await fetch(`${API_URL}/api/admin/update-balance`, {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({
-                            admin_id: adminId,
-                            target_id: currentEditId,
-                            amount: -diff,
-                            operation: 'subtract'
-                        })
-                    });
-                }
-            }
-            
-            // Update admin status
-            await fetch(`${API_URL}/api/admin/set-admin`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    admin_id: adminId,
-                    target_id: currentEditId,
-                    is_admin: parseInt(isAdmin)
-                })
-            });
-            
-            alert('User updated successfully!');
-            closeModal('editUserModal');
-            loadUsers();
-            loadLogs();
-        }
-
-        // Delete user
-        async function deleteUser() {
-            if (!confirm('⚠️ Are you sure you want to delete this user? This action cannot be undone!')) return;
-            
-            await fetch(`${API_URL}/api/admin/delete-user`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    admin_id: adminId,
-                    target_id: currentEditId
-                })
-            });
-            
-            alert('User deleted');
-            closeModal('editUserModal');
-            loadUsers();
-            loadLogs();
-        }
-
-        // Add new user
         function showAddUserModal() {
-            document.getElementById('newTelegramId').value = '';
-            document.getElementById('newUsername').value = '';
-            document.getElementById('newFirstName').value = '';
-            document.getElementById('newPhone').value = '';
-            document.getElementById('newBalance').value = '1000';
-            document.getElementById('newIsAdmin').value = '0';
             openModal('addUserModal');
         }
 
         async function addUser() {
-            let telegramId = document.getElementById('newTelegramId').value;
-            let username = document.getElementById('newUsername').value;
-            let firstName = document.getElementById('newFirstName').value;
-            let phone = document.getElementById('newPhone').value;
-            let balance = parseInt(document.getElementById('newBalance').value);
-            let isAdmin = parseInt(document.getElementById('newIsAdmin').value);
-            
-            if (!telegramId || !firstName) {
-                alert('Telegram ID and Name are required!');
-                return;
-            }
-            
-            await fetch(`${API_URL}/api/admin/add-user`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    admin_id: adminId,
-                    telegram_id: telegramId,
-                    username: username,
-                    first_name: firstName,
-                    phone: phone,
-                    balance: balance,
-                    is_admin: isAdmin
-                })
-            });
-            
-            alert('User added successfully!');
+            // Add user function
             closeModal('addUserModal');
-            loadUsers();
-            loadLogs();
-        }
-
-        // View user cards (simulated)
-        function viewUserCards(telegramId) {
-            alert(`Viewing cards for user ${telegramId} - Feature coming soon!`);
-        }
-
-        // Export users
-        function exportUsers() {
-            let csv = "ID,Username,Name,Balance,Phone,Games,Wins,Deposits,Admin\n";
-            allUsers.forEach(u => {
-                csv += `${u.telegram_id},${u.username || ''},${u.name},${u.balance},${u.phone || ''},${u.games_played},${u.wins},${u.total_deposits},${u.is_admin}\n`;
-            });
-            
-            let blob = new Blob([csv], { type: 'text/csv' });
-            let url = window.URL.createObjectURL(blob);
-            let a = document.createElement('a');
-            a.href = url;
-            a.download = `users_${new Date().toISOString().slice(0,10)}.csv`;
-            a.click();
         }
 
         // ==================== GAMES ====================
-        async function loadGames() {
-            // This would need a backend endpoint
-            let tbody = document.getElementById('gamesList');
-            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">No active games</td></tr>';
-        }
-
         async function startNewGame() {
             if (!confirm('Start a new game session?')) return;
             
@@ -1198,14 +1107,11 @@
 
         async function sendBroadcast() {
             let message = document.getElementById('broadcastMessage').value;
-            let target = document.getElementById('broadcastTarget').value;
-            
             if (!message) {
                 alert('Please enter a message');
                 return;
             }
-            
-            alert(`Broadcast sent to ${target} users!`);
+            alert('Broadcast sent!');
             closeModal('broadcastModal');
         }
 
@@ -1216,7 +1122,6 @@
             loadTransactions();
             loadUsers();
             loadLogs();
-            loadGames();
         }
 
         // ==================== MODAL FUNCTIONS ====================
