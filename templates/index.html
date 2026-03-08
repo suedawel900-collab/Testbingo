@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MK BINGO - Game Flow</title>
+    <title>MK BINGO - Card Selection</title>
     <style>
         * {
             box-sizing: border-box;
@@ -53,7 +53,7 @@
             color: gold;
         }
 
-        /* Game Status - Shows waiting for players */
+        /* Game Status */
         .game-status {
             background: rgba(0,0,0,0.4);
             padding: 15px;
@@ -63,277 +63,21 @@
             text-align: center;
         }
 
-        .status-title {
-            font-size: 1.2em;
-            color: gold;
-            margin-bottom: 10px;
-        }
-
-        .cards-progress {
-            font-size: 2em;
-            font-weight: bold;
-            color: gold;
-        }
-
-        .players-list {
-            margin-top: 15px;
-            max-height: 150px;
-            overflow-y: auto;
-        }
-
-        .player-item {
-            background: rgba(255,255,255,0.1);
-            padding: 8px;
-            margin: 5px 0;
-            border-radius: 8px;
+        /* Card Selection Grid */
+        .selection-info {
             display: flex;
             justify-content: space-between;
-        }
-
-        .waiting-message {
-            color: #ff9800;
-            font-size: 1.1em;
             margin: 10px 0;
-        }
-
-        .ready-message {
-            color: #4CAF50;
-            font-size: 1.1em;
-            margin: 10px 0;
-        }
-
-        /* Countdown */
-        .countdown-container {
-            text-align: center;
-            padding: 30px;
-            background: rgba(0,0,0,0.5);
-            border-radius: 20px;
-            border: 3px solid gold;
-            margin: 20px 0;
-        }
-
-        .countdown-number {
-            color: gold;
-            font-size: 5em;
-            font-weight: bold;
-            animation: pulse 1s infinite;
-        }
-
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.1); }
-            100% { transform: scale(1); }
-        }
-
-        /* Game Page */
-        .game-header {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 10px;
+            padding: 10px;
             background: rgba(0,0,0,0.3);
-            padding: 10px;
             border-radius: 10px;
         }
 
-        .timer {
-            font-size: 1.8em;
-            color: gold;
-            font-weight: bold;
-        }
-
-        /* Mode Toggle */
-        .mode-container {
-            background: rgba(0,0,0,0.4);
-            padding: 10px;
-            border-radius: 40px;
-            margin: 10px 0;
-            border: 2px solid gold;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .toggle-switch {
-            position: relative;
-            display: inline-block;
-            width: 90px;
-            height: 38px;
-        }
-
-        .toggle-switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-
-        .slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(135deg, #f44336, #d32f2f);
-            transition: .4s;
-            border-radius: 38px;
-            border: 2px solid white;
-        }
-
-        .slider:before {
-            position: absolute;
-            content: "MANUAL";
-            height: 30px;
-            width: 45px;
-            left: 4px;
-            bottom: 3px;
-            background: white;
-            transition: .4s;
-            border-radius: 30px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.7em;
-            font-weight: bold;
-            color: black;
-        }
-
-        input:checked + .slider {
-            background: linear-gradient(135deg, #4CAF50, #45a049);
-        }
-
-        input:checked + .slider:before {
-            content: "AUTO";
-            transform: translateX(45px);
-        }
-
-        /* Called Numbers */
-        .called-numbers {
-            background: rgba(0,0,0,0.3);
-            padding: 10px;
-            border-radius: 10px;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 5px;
-            min-height: 60px;
-            margin: 10px 0;
-        }
-
-        .number-ball {
-            width: 35px;
-            height: 35px;
-            border-radius: 50%;
-            background: gold;
-            color: black;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-        }
-
-        /* BINGO Button */
-        .bingo-btn {
-            background: #f44336;
-            color: white;
-            font-size: 1.8em;
-            font-weight: bold;
-            padding: 15px;
-            border: none;
-            border-radius: 50px;
-            width: 100%;
-            margin: 15px 0;
-            cursor: pointer;
-            animation: bingoPulse 1.5s infinite;
-        }
-
-        .bingo-btn:disabled {
-            opacity: 0.5;
-            animation: none;
-        }
-
-        @keyframes bingoPulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.02); }
-            100% { transform: scale(1); }
-        }
-
-        /* Cards Grid - 2 per row */
-        .cards-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 10px;
-            margin: 15px 0;
-            max-height: 400px;
-            overflow-y: auto;
-        }
-
-        .bingo-card {
-            background: white;
-            border-radius: 10px;
-            padding: 8px;
-            border: 2px solid gold;
-        }
-
-        .card-header {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 5px;
-            font-size: 0.8em;
-        }
-
-        .card-number {
-            color: gold;
-            font-weight: bold;
-        }
-
-        .bingo-header {
-            display: grid;
-            grid-template-columns: repeat(5, 1fr);
-            gap: 2px;
-            margin-bottom: 2px;
-        }
-
-        .bingo-letter {
-            background: gold;
-            color: black;
-            text-align: center;
-            padding: 3px;
-            font-size: 0.8em;
-            font-weight: bold;
-            border-radius: 3px;
-        }
-
-        .gridCard {
-            display: grid;
-            grid-template-columns: repeat(5, 1fr);
-            gap: 2px;
-        }
-
-        .cell {
-            background: #f0f0f0;
-            color: #333;
-            text-align: center;
-            padding: 5px 0;
-            font-size: 0.7em;
-            font-weight: bold;
-            border-radius: 3px;
-        }
-
-        .cell.marked {
-            background: #4CAF50;
-            color: white;
-        }
-
-        .cell.free {
-            background: gold;
-            color: black;
-        }
-
-        /* Card Selection */
         #grid {
             display: grid;
             grid-template-columns: repeat(20, 1fr);
             gap: 2px;
-            max-height: 150px;
+            max-height: 300px;
             overflow-y: auto;
             padding: 10px;
             background: rgba(0,0,0,0.3);
@@ -344,27 +88,146 @@
         .box {
             background: white;
             color: black;
-            padding: 4px 0;
-            font-size: 0.6em;
+            padding: 5px 0;
+            font-size: 0.7em;
             text-align: center;
             cursor: pointer;
             border-radius: 3px;
+            border: 2px solid transparent;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .box.available {
+            background: white;
+            color: black;
+            border-color: #4CAF50;
+        }
+
+        .box.available:hover {
+            transform: scale(1.1);
+            background: #4CAF50;
+            color: white;
         }
 
         .box.selected {
             background: #4CAF50;
             color: white;
+            border-color: gold;
         }
 
-        .summary-bar {
+        /* PURCHASED CARDS - DISABLED */
+        .box.purchased {
+            background: #cccccc;
+            color: #666666;
+            cursor: not-allowed;
+            border-color: #f44336;
+            opacity: 0.7;
+            position: relative;
+        }
+
+        .box.purchased::after {
+            content: "❌";
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            font-size: 0.6em;
+            background: #f44336;
+            color: white;
+            border-radius: 50%;
+            width: 15px;
+            height: 15px;
             display: flex;
-            justify-content: space-between;
-            background: rgba(0,0,0,0.3);
-            padding: 10px;
-            border-radius: 20px;
-            margin: 10px 0;
+            align-items: center;
+            justify-content: center;
         }
 
+        .box.purchased:hover {
+            transform: none;
+            background: #cccccc;
+        }
+
+        .box.own-purchased {
+            background: #4CAF50;
+            color: white;
+            border-color: gold;
+            cursor: default;
+            opacity: 1;
+        }
+
+        .box.own-purchased::after {
+            content: "✓";
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            font-size: 0.6em;
+            background: gold;
+            color: black;
+            border-radius: 50%;
+            width: 15px;
+            height: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Legend */
+        .legend {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin: 10px 0;
+            font-size: 0.8em;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 3px;
+        }
+
+        .color-available {
+            background: white;
+            border: 2px solid #4CAF50;
+        }
+
+        .color-purchased {
+            background: #cccccc;
+            border: 2px solid #f44336;
+        }
+
+        .color-mine {
+            background: #4CAF50;
+            border: 2px solid gold;
+        }
+
+        /* Message */
+        .message-box {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #f44336;
+            color: white;
+            padding: 15px 30px;
+            border-radius: 50px;
+            border: 2px solid gold;
+            z-index: 1000;
+            animation: slideDown 0.3s ease;
+        }
+
+        @keyframes slideDown {
+            from { top: -100px; }
+            to { top: 20px; }
+        }
+
+        /* Buttons */
         button {
             padding: 10px 20px;
             border: none;
@@ -388,6 +251,16 @@
             margin-top: 10px;
         }
 
+        /* Summary Bar */
+        .summary-bar {
+            display: flex;
+            justify-content: space-between;
+            background: rgba(0,0,0,0.3);
+            padding: 10px;
+            border-radius: 20px;
+            margin: 10px 0;
+        }
+
         /* Page visibility */
         #selectPage, #waitingPage, #countdownPage, #gamePage {
             display: none;
@@ -407,9 +280,25 @@
             <span id="playerBalance">{{ balance|default('1000') }}</span> ETB
         </div>
 
-        <!-- SELECTION PAGE - Buy Cards -->
+        <!-- SELECTION PAGE -->
         <div id="selectPage" class="active">
             <h3 style="text-align: center;">🎫 Select Cards (1-1000)</h3>
+            
+            <!-- Legend -->
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color color-available"></div>
+                    <span>Available</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color color-purchased"></div>
+                    <span>Sold</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color color-mine"></div>
+                    <span>My Cards</span>
+                </div>
+            </div>
             
             <!-- Range Selector -->
             <div style="display: flex; gap: 3px; flex-wrap: wrap; justify-content: center; margin: 5px 0;" id="rangeSelector"></div>
@@ -423,76 +312,17 @@
             </div>
 
             <div style="text-align: center;">
-                <button onclick="confirmCards()" id="confirmBtn">✅ BUY CARDS</button>
+                <button onclick="confirmCards()" id="confirmBtn" disabled>✅ BUY CARDS</button>
                 <button class="cancel-btn" onclick="cancelSelection()">❌ CLEAR</button>
             </div>
             
             <div class="footer-info" style="text-align:center; font-size:0.8em; margin-top:10px;">
-                * Minimum 1 card to join • Game starts when 10 total cards sold
+                * Each card can only be bought once • Green = Available • Red = Sold
             </div>
         </div>
 
-        <!-- WAITING PAGE - Wait for other players -->
-        <div id="waitingPage">
-            <div class="game-status">
-                <div class="status-title">⏳ WAITING FOR PLAYERS</div>
-                <div class="cards-progress">
-                    <span id="totalCardsSold">0</span>/10 Cards
-                </div>
-                <div style="margin: 10px 0; font-size: 1.2em;" id="playersCount">0 Players Joined</div>
-                
-                <div class="players-list" id="playersList">
-                    <!-- Players will appear here -->
-                </div>
-                
-                <div class="waiting-message" id="waitingMessage">
-                    Need <span id="cardsNeeded">10</span> more cards to start...
-                </div>
-                
-                <div style="margin-top: 20px;">
-                    <button class="back-btn" onclick="backToSelection()">🔙 Cancel & Leave</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- COUNTDOWN PAGE - 30s Countdown -->
-        <div id="countdownPage">
-            <div class="countdown-container">
-                <div class="countdown-number" id="countdown">30</div>
-                <div style="font-size: 1.3em; margin: 10px;">Game Starting!</div>
-                <div style="color: gold;" id="countdownInfo"></div>
-            </div>
-        </div>
-
-        <!-- GAME PAGE - Play Game -->
-        <div id="gamePage">
-            <div class="game-header">
-                <div>🎯 GAME</div>
-                <div class="timer" id="gameTimer">00:00</div>
-            </div>
-
-            <!-- Mode Toggle -->
-            <div class="mode-container">
-                <span style="color:#ff9800;">✋ MANUAL</span>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="markModeToggle" checked onchange="toggleMarkMode()">
-                    <span class="slider"></span>
-                </label>
-                <span style="color:#4CAF50;">🔄 AUTO</span>
-            </div>
-
-            <!-- Called Numbers -->
-            <div class="called-numbers" id="numbersList"></div>
-
-            <!-- BINGO Button -->
-            <button class="bingo-btn" onclick="callBingo()" id="bingoBtn" disabled>🔴 BINGO!</button>
-
-            <!-- Cards - 2 per row -->
-            <div class="cards-grid" id="gameCards"></div>
-
-            <!-- Back Button -->
-            <button class="back-btn" onclick="backToSelection()">🔙 LEAVE GAME</button>
-        </div>
+        <!-- Message Container -->
+        <div id="messageContainer"></div>
     </div>
 
     <script>
@@ -501,71 +331,37 @@
         let playerBalance = {{ balance|default(1000) }};
         let userId = "{{ user_id|default('guest') }}";
         
-        // Game state
-        let currentGameCards = {};
+        // TRACK PURCHASED CARDS GLOBALLY
+        let purchasedCards = new Set();  // Card numbers that are already bought by anyone
+        
+        // Track current user's purchased cards
+        let myPurchasedCards = new Set();
+        
         let gameSettings = {
-            calledNumbers: [],
-            winners: [],
-            isGameActive: false,
-            gameType: 'full house',
-            prizeAmount: 2000,
-            cardPrice: 10,
-            minCardsToStart: 10
+            cardPrice: 10
         };
-        
-        // Session info (would come from server in real app)
-        let sessionInfo = {
-            totalCardsSold: 0,
-            players: [],  // { id, name, cards }
-            status: 'waiting'
-        };
-        
-        // Marking mode
-        let autoMarkEnabled = true;
-        let manuallyMarked = {};
-        let disabledCards = new Set();
-        
-        // Timers
-        let gameTimer = null;
-        let callInterval = null;
-        let countdownInterval = null;
-        let sessionCheckInterval = null;
-        let gameStarted = false;
-        let bingoButtonEnabled = false;
-
-        const API_URL = window.location.origin;
-
-        // ==================== PAGE MANAGEMENT ====================
-        function showPage(page) {
-            document.getElementById('selectPage').classList.remove('active');
-            document.getElementById('waitingPage').classList.remove('active');
-            document.getElementById('countdownPage').classList.remove('active');
-            document.getElementById('gamePage').classList.remove('active');
-            document.getElementById(page + 'Page').classList.add('active');
-        }
 
         // ==================== INIT ====================
         window.onload = function() {
             createNumberGrid();
             createRangeSelector();
             updateSummary();
-            loadGameSettings();
-            
-            // Simulate session updates (in real app, this would be from server)
-            sessionCheckInterval = setInterval(checkSessionStatus, 2000);
+            loadPurchasedCards(); // Simulate loading purchased cards from server
         };
 
-        // ==================== SIMULATE SESSION (REPLACE WITH REAL API) ====================
-        function checkSessionStatus() {
-            // This simulates other players joining
+        // ==================== SIMULATE LOADING PURCHASED CARDS ====================
+        function loadPurchasedCards() {
             // In real app, this would fetch from server
-            
-            if (sessionInfo.status === 'waiting') {
-                updateWaitingPage();
+            // For demo, randomly mark some cards as purchased
+            for (let i = 1; i <= 1000; i++) {
+                if (Math.random() < 0.1) { // 10% of cards are already purchased
+                    purchasedCards.add(i);
+                }
             }
+            updateGridDisplay();
         }
 
-        // ==================== RANGE SELECTOR ====================
+        // ==================== CREATE RANGE SELECTOR ====================
         function createRangeSelector() {
             let selector = document.getElementById("rangeSelector");
             let ranges = [
@@ -601,63 +397,83 @@
             
             for (let i = 1; i <= 1000; i++) {
                 let box = document.createElement("div");
-                box.className = "box";
+                box.className = "box available";
                 box.innerText = i;
                 box.id = `card-${i}`;
 
-                box.onclick = () => {
-                    if (gameStarted) {
-                        alert("Game in progress!");
-                        return;
-                    }
-                    
-                    if (selectedCards[i]) {
-                        delete selectedCards[i];
-                        box.classList.remove("selected");
-                    } else {
-                        selectedCards[i] = generateBingoCard(i);
-                        box.classList.add("selected");
-                    }
-                    updateSummary();
-                };
+                box.onclick = () => handleCardClick(i, box);
+                
                 grid.appendChild(box);
             }
+            
+            updateGridDisplay();
         }
 
-        // ==================== GENERATE CARD ====================
-        function generateBingoCard(cardNumber) {
-            let card = new Array(25).fill(0);
-            let seed = cardNumber || Math.floor(Math.random() * 1000);
-            
-            // Generate columns
-            let bCol = []; while (bCol.length < 5) { let n = ((seed * 1 + bCol.length * 7) % 15) + 1; if (!bCol.includes(n)) bCol.push(n); }
-            let iCol = []; while (iCol.length < 5) { let n = ((seed * 2 + iCol.length * 7) % 15) + 16; if (!iCol.includes(n)) iCol.push(n); }
-            let nCol = []; while (nCol.length < 5) { let n = ((seed * 3 + nCol.length * 7) % 15) + 31; if (!nCol.includes(n)) nCol.push(n); }
-            let gCol = []; while (gCol.length < 5) { let n = ((seed * 4 + gCol.length * 7) % 15) + 46; if (!gCol.includes(n)) gCol.push(n); }
-            let oCol = []; while (oCol.length < 5) { let n = ((seed * 5 + oCol.length * 7) % 15) + 61; if (!oCol.includes(n)) oCol.push(n); }
-            
-            for (let row = 0; row < 5; row++) {
-                card[row * 5 + 0] = bCol[row];
-                card[row * 5 + 1] = iCol[row];
-                card[row * 5 + 2] = nCol[row];
-                card[row * 5 + 3] = gCol[row];
-                card[row * 5 + 4] = oCol[row];
+        // ==================== HANDLE CARD CLICK ====================
+        function handleCardClick(cardNumber, box) {
+            // Check if card is already purchased by someone else
+            if (purchasedCards.has(cardNumber) && !myPurchasedCards.has(cardNumber)) {
+                showMessage(`❌ Card #${cardNumber} is already purchased by another player!`);
+                return;
             }
-            card[12] = "FREE";
-            return card;
+            
+            // If it's my purchased card, can't select again
+            if (myPurchasedCards.has(cardNumber)) {
+                showMessage(`ℹ️ Card #${cardNumber} is already in your collection`);
+                return;
+            }
+            
+            // Toggle selection
+            if (selectedCards[cardNumber]) {
+                delete selectedCards[cardNumber];
+                if (!purchasedCards.has(cardNumber)) {
+                    box.className = "box available";
+                }
+            } else {
+                // Check if trying to select more than balance allows
+                let total = (Object.keys(selectedCards).length + 1) * gameSettings.cardPrice;
+                if (total > playerBalance) {
+                    showMessage(`❌ Insufficient balance! Need ${total} ETB`);
+                    return;
+                }
+                
+                selectedCards[cardNumber] = true;
+                box.className = "box selected";
+            }
+            
+            updateSummary();
+            updateConfirmButton();
         }
 
-        // ==================== LOAD SETTINGS ====================
-        async function loadGameSettings() {
-            try {
-                let response = await fetch(`${API_URL}/api/game/settings`);
-                let data = await response.json();
-                if (data.success) {
-                    gameSettings.gameType = data.game_type;
-                    gameSettings.cardPrice = data.card_price;
-                    gameSettings.prizeAmount = data.prize_pool;
+        // ==================== UPDATE GRID DISPLAY ====================
+        function updateGridDisplay() {
+            for (let i = 1; i <= 1000; i++) {
+                let box = document.getElementById(`card-${i}`);
+                if (!box) continue;
+                
+                if (myPurchasedCards.has(i)) {
+                    box.className = "box own-purchased";
+                } else if (purchasedCards.has(i)) {
+                    box.className = "box purchased";
+                } else if (selectedCards[i]) {
+                    box.className = "box selected";
+                } else {
+                    box.className = "box available";
                 }
-            } catch (e) {}
+            }
+        }
+
+        // ==================== SHOW MESSAGE ====================
+        function showMessage(text) {
+            let container = document.getElementById('messageContainer');
+            let msg = document.createElement('div');
+            msg.className = 'message-box';
+            msg.innerText = text;
+            container.appendChild(msg);
+            
+            setTimeout(() => {
+                msg.remove();
+            }, 3000);
         }
 
         // ==================== UPDATE SUMMARY ====================
@@ -668,19 +484,36 @@
             document.getElementById("totalPrice").innerText = total;
         }
 
-        // ==================== CONFIRM CARDS - Player joins game ====================
+        // ==================== UPDATE CONFIRM BUTTON ====================
+        function updateConfirmButton() {
+            let count = Object.keys(selectedCards).length;
+            let btn = document.getElementById('confirmBtn');
+            btn.disabled = count === 0;
+        }
+
+        // ==================== CONFIRM CARDS ====================
         async function confirmCards() {
             let count = Object.keys(selectedCards).length;
             let total = count * gameSettings.cardPrice;
             
-            // NEW RULE: Minimum 1 card to join
             if (count === 0) {
-                alert("Please select at least 1 card to join the game!");
+                showMessage("Please select at least 1 card!");
                 return;
             }
             
+            // Double-check purchased status
+            for (let cardNum in selectedCards) {
+                if (purchasedCards.has(parseInt(cardNum))) {
+                    showMessage(`❌ Card #${cardNum} was just purchased by someone else!`);
+                    delete selectedCards[cardNum];
+                    updateGridDisplay();
+                    updateSummary();
+                    return;
+                }
+            }
+            
             if (playerBalance < total) {
-                alert(`Insufficient balance! Need ${total} ETB`);
+                showMessage(`❌ Insufficient balance! Need ${total} ETB`);
                 return;
             }
             
@@ -688,27 +521,20 @@
             playerBalance -= total;
             document.getElementById("playerBalance").innerText = playerBalance;
             
-            // Save player's cards
+            // Mark cards as purchased
             for (let cardNum in selectedCards) {
-                currentGameCards[cardNum] = {
-                    numbers: selectedCards[cardNum],
-                    active: true
-                };
+                let num = parseInt(cardNum);
+                purchasedCards.add(num);
+                myPurchasedCards.add(num);
             }
-            
-            // Add player to session
-            let playerName = `Player_${userId.slice(-4)}`;
-            sessionInfo.players.push({
-                id: userId,
-                name: playerName,
-                cards: count
-            });
-            sessionInfo.totalCardsSold += count;
             
             // Clear selection
             selectedCards = {};
-            document.querySelectorAll(".box").forEach(b => b.classList.remove("selected"));
+            updateGridDisplay();
             updateSummary();
+            updateConfirmButton();
+            
+            showMessage(`✅ Successfully purchased ${count} cards!`);
             
             // Send to server (in real app)
             try {
@@ -717,241 +543,37 @@
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
                         user_id: userId,
-                        cards_bought: count,
-                        total_paid: total
+                        cards_bought: Array.from(myPurchasedCards)
                     })
                 });
             } catch (e) {}
-            
-            // Go to waiting page
-            showPage('waiting');
-            updateWaitingPage();
         }
 
         function cancelSelection() {
-            if (Object.keys(selectedCards).length > 0 && confirm("Clear all?")) {
+            if (Object.keys(selectedCards).length > 0 && confirm("Clear all selections?")) {
                 selectedCards = {};
-                document.querySelectorAll(".box").forEach(b => b.classList.remove("selected"));
+                updateGridDisplay();
                 updateSummary();
+                updateConfirmButton();
             }
         }
 
-        // ==================== WAITING PAGE - Show players and cards ====================
-        function updateWaitingPage() {
-            document.getElementById('totalCardsSold').innerText = sessionInfo.totalCardsSold;
-            document.getElementById('playersCount').innerText = sessionInfo.players.length + ' Players Joined';
-            
-            let needed = Math.max(0, 10 - sessionInfo.totalCardsSold);
-            document.getElementById('cardsNeeded').innerText = needed;
-            
-            // Update players list
-            let playersList = document.getElementById('playersList');
-            playersList.innerHTML = '';
-            
-            sessionInfo.players.forEach(p => {
-                let div = document.createElement('div');
-                div.className = 'player-item';
-                div.innerHTML = `
-                    <span>${p.name}</span>
-                    <span style="color:gold;">${p.cards} cards</span>
-                `;
-                playersList.appendChild(div);
-            });
-            
-            // Check if we have 10 cards total
-            if (sessionInfo.totalCardsSold >= 10 && sessionInfo.status === 'waiting') {
-                sessionInfo.status = 'countdown';
-                startCountdown();
-            }
-        }
-
-        // ==================== COUNTDOWN ====================
-        function startCountdown() {
-            showPage('countdown');
-            
-            let countdown = 30;
-            document.getElementById('countdown').innerText = countdown;
-            document.getElementById('countdownInfo').innerHTML = `
-                🎮 ${sessionInfo.totalCardsSold} cards sold<br>
-                👥 ${sessionInfo.players.length} players
-            `;
-            
-            countdownInterval = setInterval(() => {
-                countdown--;
-                document.getElementById('countdown').innerText = countdown;
-                
-                if (countdown <= 0) {
-                    clearInterval(countdownInterval);
-                    startGame();
+        // ==================== SIMULATE OTHER PLAYERS BUYING (for testing) ====================
+        function simulateOtherPlayerPurchase() {
+            // This simulates another player buying a random card
+            // In real app, this would come from server via WebSocket
+            setInterval(() => {
+                let randomCard = Math.floor(Math.random() * 1000) + 1;
+                if (!purchasedCards.has(randomCard) && !selectedCards[randomCard]) {
+                    purchasedCards.add(randomCard);
+                    updateGridDisplay();
+                    showMessage(`👤 Another player bought card #${randomCard}`);
                 }
-            }, 1000);
+            }, 10000);
         }
 
-        // ==================== START GAME ====================
-        function startGame() {
-            showPage('game');
-            
-            gameStarted = true;
-            gameSettings.isGameActive = true;
-            gameSettings.calledNumbers = [];
-            gameSettings.winners = [];
-            disabledCards.clear();
-            manuallyMarked = {};
-            
-            startTimer();
-            showGameCards();
-            startNumberCalls();
-        }
-
-        // ==================== SHOW GAME CARDS ====================
-        function showGameCards() {
-            let container = document.getElementById("gameCards");
-            container.innerHTML = "";
-            
-            let sortedCards = Object.keys(currentGameCards).sort((a,b) => parseInt(a) - parseInt(b));
-            
-            for (let cardNum of sortedCards) {
-                let cardData = currentGameCards[cardNum];
-                let isDisabled = disabledCards.has(parseInt(cardNum));
-                
-                let div = document.createElement("div");
-                div.className = "bingo-card";
-
-                // Header
-                let header = document.createElement("div");
-                header.className = "card-header";
-                header.innerHTML = `
-                    <span class="card-number">#${cardNum}</span>
-                    <span style="color:${isDisabled ? '#f44336' : '#4CAF50'}">${isDisabled ? '❌' : '✓'}</span>
-                `;
-                div.appendChild(header);
-
-                // BINGO Header
-                let bingoHeader = document.createElement("div");
-                bingoHeader.className = "bingo-header";
-                ['B', 'I', 'N', 'G', 'O'].forEach(letter => {
-                    let l = document.createElement("div");
-                    l.className = "bingo-letter";
-                    l.innerText = letter;
-                    bingoHeader.appendChild(l);
-                });
-                div.appendChild(bingoHeader);
-
-                // Grid
-                let grid = document.createElement("div");
-                grid.className = "gridCard";
-
-                cardData.numbers.forEach((num, index) => {
-                    let cell = document.createElement("div");
-                    cell.className = "cell";
-                    
-                    if (num === "FREE") {
-                        cell.classList.add("free");
-                    } else if (gameSettings.calledNumbers.includes(num)) {
-                        cell.classList.add("marked");
-                    }
-                    
-                    cell.innerText = num;
-                    grid.appendChild(cell);
-                });
-
-                div.appendChild(grid);
-                container.appendChild(div);
-            }
-        }
-
-        // ==================== TOGGLE MODE ====================
-        function toggleMarkMode() {
-            autoMarkEnabled = document.getElementById('markModeToggle').checked;
-        }
-
-        // ==================== CALL BINGO ====================
-        function callBingo() {
-            if (!bingoButtonEnabled) return alert("Wait for numbers!");
-            
-            // Simple win check (full house)
-            let allMarked = true;
-            for (let cardNum in currentGameCards) {
-                if (disabledCards.has(parseInt(cardNum))) continue;
-                let card = currentGameCards[cardNum].numbers;
-                for (let i = 0; i < card.length; i++) {
-                    if (card[i] !== "FREE" && !gameSettings.calledNumbers.includes(card[i])) {
-                        allMarked = false;
-                        break;
-                    }
-                }
-            }
-            
-            if (allMarked) {
-                alert("🎉 BINGO! YOU WIN!");
-                document.getElementById('bingoBtn').disabled = true;
-            } else {
-                alert("❌ FALSE BINGO! One card disabled");
-                // Disable first active card
-                for (let cardNum in currentGameCards) {
-                    if (!disabledCards.has(parseInt(cardNum))) {
-                        disabledCards.add(parseInt(cardNum));
-                        break;
-                    }
-                }
-                showGameCards();
-            }
-        }
-
-        // ==================== BACK TO SELECTION ====================
-        function backToSelection() {
-            if (countdownInterval) clearInterval(countdownInterval);
-            if (gameTimer) clearInterval(gameTimer);
-            if (callInterval) clearInterval(callInterval);
-            
-            // Remove player from session
-            sessionInfo.players = sessionInfo.players.filter(p => p.id !== userId);
-            sessionInfo.totalCardsSold = sessionInfo.players.reduce((sum, p) => sum + p.cards, 0);
-            sessionInfo.status = 'waiting';
-            
-            showPage('select');
-            
-            gameStarted = false;
-            gameSettings.isGameActive = false;
-            gameSettings.calledNumbers = [];
-            disabledCards.clear();
-            document.getElementById('numbersList').innerHTML = '';
-        }
-
-        // ==================== START NUMBER CALLS ====================
-        function startNumberCalls() {
-            callInterval = setInterval(() => {
-                if (!gameSettings.isGameActive) return;
-                
-                let num = Math.floor(Math.random() * 75) + 1;
-                if (!gameSettings.calledNumbers.includes(num)) {
-                    gameSettings.calledNumbers.push(num);
-                    
-                    let list = document.getElementById('numbersList');
-                    let ball = document.createElement('span');
-                    ball.className = 'number-ball';
-                    ball.innerText = num;
-                    list.appendChild(ball);
-                    
-                    showGameCards();
-                    
-                    document.getElementById('bingoBtn').disabled = false;
-                    bingoButtonEnabled = true;
-                }
-            }, 3000);
-        }
-
-        // ==================== TIMER ====================
-        function startTimer() {
-            let seconds = 0;
-            gameTimer = setInterval(() => {
-                seconds++;
-                let mins = Math.floor(seconds / 60);
-                let secs = seconds % 60;
-                document.getElementById('gameTimer').innerText = 
-                    `${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
-            }, 1000);
-        }
+        // Uncomment to test real-time updates
+        // simulateOtherPlayerPurchase();
     </script>
 </body>
 </html>
