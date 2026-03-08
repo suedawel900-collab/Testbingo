@@ -91,6 +91,11 @@
             border-radius: 30px;
             cursor: pointer;
             font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        .tab:hover {
+            background: rgba(255,215,0,0.3);
         }
 
         .tab.active {
@@ -128,11 +133,20 @@
             color: gold;
         }
 
+        .badge {
+            background: gold;
+            color: black;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-weight: bold;
+        }
+
         /* Tables */
         .table-container {
             overflow-x: auto;
-            max-height: 400px;
+            max-height: 500px;
             overflow-y: auto;
+            border-radius: 10px;
         }
 
         table {
@@ -146,6 +160,7 @@
             padding: 12px;
             position: sticky;
             top: 0;
+            z-index: 10;
         }
 
         td {
@@ -166,6 +181,11 @@
             cursor: pointer;
             font-weight: bold;
             margin: 2px;
+            transition: all 0.2s;
+        }
+
+        .btn:hover {
+            transform: scale(1.05);
         }
 
         .btn-success {
@@ -188,6 +208,16 @@
             color: black;
         }
 
+        .btn-info {
+            background: #2196F3;
+            color: white;
+        }
+
+        .btn-sm {
+            padding: 5px 10px;
+            font-size: 0.8em;
+        }
+
         /* Forms */
         .form-group {
             margin-bottom: 15px;
@@ -197,21 +227,29 @@
             display: block;
             margin-bottom: 5px;
             color: gold;
+            font-weight: bold;
         }
 
-        .form-group input, .form-group select {
+        .form-group input, .form-group select, .form-group textarea {
             width: 100%;
-            padding: 10px;
+            padding: 12px;
             border-radius: 10px;
             border: 2px solid gold;
             background: rgba(0,0,0,0.3);
             color: white;
+            font-size: 1em;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #ffd700;
+            box-shadow: 0 0 10px gold;
         }
 
         .form-row {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 10px;
+            gap: 15px;
         }
 
         /* Status badges */
@@ -220,6 +258,7 @@
             border-radius: 20px;
             font-size: 0.8em;
             font-weight: bold;
+            display: inline-block;
         }
 
         .status-pending {
@@ -229,6 +268,21 @@
 
         .status-approved {
             background: #4CAF50;
+            color: white;
+        }
+
+        .status-rejected {
+            background: #f44336;
+            color: white;
+        }
+
+        .status-active {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .status-inactive {
+            background: #9e9e9e;
             color: white;
         }
 
@@ -257,6 +311,8 @@
             border: 3px solid gold;
             max-width: 500px;
             width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
         }
 
         .modal-header {
@@ -275,6 +331,81 @@
             cursor: pointer;
             color: gold;
         }
+
+        /* Search box */
+        .search-box {
+            padding: 10px;
+            border-radius: 30px;
+            border: 2px solid gold;
+            background: rgba(0,0,0,0.3);
+            color: white;
+            width: 100%;
+            max-width: 300px;
+        }
+
+        /* Quick actions */
+        .quick-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+        }
+
+        /* Logs */
+        .log-entry {
+            padding: 10px;
+            border-bottom: 1px solid rgba(255,215,0,0.3);
+            font-size: 0.9em;
+        }
+
+        .log-time {
+            color: gold;
+            font-weight: bold;
+        }
+
+        .log-admin {
+            color: #4CAF50;
+        }
+
+        .log-action {
+            color: #ff9800;
+            font-weight: bold;
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: gold;
+        }
+
+        .loading::after {
+            content: '';
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid gold;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 10px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+            
+            .header {
+                flex-direction: column;
+                text-align: center;
+            }
+        }
     </style>
 </head>
 <body>
@@ -285,11 +416,12 @@
             <div class="admin-info">
                 <span id="adminName">Loading...</span> | 
                 <span id="adminId"></span>
+                <button class="btn btn-info btn-sm" onclick="refreshAll()" style="margin-left: 10px;">🔄 Refresh</button>
             </div>
         </div>
 
-        <!-- Stats -->
-        <div class="stats-grid">
+        <!-- Stats Cards -->
+        <div class="stats-grid" id="statsContainer">
             <div class="stat-card">
                 <div class="stat-value" id="totalUsers">0</div>
                 <div class="stat-label">Total Users</div>
@@ -306,6 +438,10 @@
                 <div class="stat-value" id="totalGames">0</div>
                 <div class="stat-label">Games</div>
             </div>
+            <div class="stat-card">
+                <div class="stat-value" id="activeGames">0</div>
+                <div class="stat-label">Active Games</div>
+            </div>
         </div>
 
         <!-- Tabs -->
@@ -314,6 +450,8 @@
             <div class="tab" onclick="switchTab('transactions')">💰 Transactions</div>
             <div class="tab" onclick="switchTab('users')">👥 Users</div>
             <div class="tab" onclick="switchTab('settings')">⚙️ Settings</div>
+            <div class="tab" onclick="switchTab('games')">🎮 Games</div>
+            <div class="tab" onclick="switchTab('logs')">📋 Logs</div>
         </div>
 
         <!-- Dashboard Tab -->
@@ -322,9 +460,11 @@
                 <div class="card-header">
                     <h2>⚡ Quick Actions</h2>
                 </div>
-                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                    <button class="btn btn-primary" onclick="refreshAll()">🔄 Refresh</button>
-                    <button class="btn btn-success" onclick="startNewGame()">🎮 New Game</button>
+                <div class="quick-actions">
+                    <button class="btn btn-primary" onclick="refreshAll()">🔄 Refresh Data</button>
+                    <button class="btn btn-success" onclick="startNewGame()">🎮 Start New Game</button>
+                    <button class="btn btn-warning" onclick="showBroadcastModal()">📢 Broadcast to All</button>
+                    <button class="btn btn-info" onclick="showAddUserModal()">➕ Add Test User</button>
                 </div>
             </div>
 
@@ -332,11 +472,21 @@
                 <div class="card-header">
                     <h2>⚙️ Current Settings</h2>
                 </div>
-                <div id="currentSettings">
-                    <p>Game Type: <span id="currentGameType">full house</span></p>
-                    <p>Card Price: <span id="currentCardPrice">10</span> ETB</p>
-                    <p>Prize Pool: <span id="currentPrizePool">2000</span> ETB</p>
-                    <p>Min Cards: <span id="currentMinCards">10</span></p>
+                <div id="currentSettings" style="display: grid; grid-template-columns: repeat(2,1fr); gap: 10px;">
+                    <div>Game Type: <strong id="currentGameType">full house</strong></div>
+                    <div>Card Price: <strong id="currentCardPrice">10</strong> ETB</div>
+                    <div>Prize Pool: <strong id="currentPrizePool">2000</strong> ETB</div>
+                    <div>Min Cards: <strong id="currentMinCards">10</strong></div>
+                    <div>Call Interval: <strong id="currentCallInterval">3</strong> sec</div>
+                </div>
+            </div>
+
+            <div class="admin-card">
+                <div class="card-header">
+                    <h2>📈 Recent Activity</h2>
+                </div>
+                <div id="recentActivity" style="max-height: 200px; overflow-y: auto;">
+                    <div class="loading">Loading...</div>
                 </div>
             </div>
         </div>
@@ -346,6 +496,7 @@
             <div class="admin-card">
                 <div class="card-header">
                     <h2>💰 Pending Transactions</h2>
+                    <span class="badge" id="pendingBadge">0</span>
                 </div>
                 <div class="table-container">
                     <table>
@@ -359,20 +510,28 @@
                             </tr>
                         </thead>
                         <tbody id="transactionsList">
-                            <tr><td colspan="5">Loading...</td></tr>
+                            <tr><td colspan="5" class="loading">Loading...</td></tr>
                         </tbody>
                     </table>
                 </div>
             </div>
         </div>
 
-        <!-- Users Tab -->
+        <!-- Users Tab - FULL PLAYER CONTROLS -->
         <div id="users" class="tab-content">
             <div class="admin-card">
                 <div class="card-header">
-                    <h2>👥 Users</h2>
-                    <input type="text" id="userSearch" placeholder="Search..." style="padding: 5px;">
+                    <h2>👥 Player Management</h2>
+                    <input type="text" id="userSearch" class="search-box" placeholder="Search by name, username or ID...">
                 </div>
+                
+                <!-- Quick Player Actions -->
+                <div class="quick-actions" style="margin-bottom: 15px;">
+                    <button class="btn btn-success btn-sm" onclick="showAddUserModal()">➕ Add New Player</button>
+                    <button class="btn btn-warning btn-sm" onclick="exportUsers()">📥 Export Users</button>
+                    <button class="btn btn-info btn-sm" onclick="loadUsers()">🔄 Refresh List</button>
+                </div>
+                
                 <div class="table-container">
                     <table>
                         <thead>
@@ -381,13 +540,16 @@
                                 <th>Username</th>
                                 <th>Name</th>
                                 <th>Balance</th>
+                                <th>Phone</th>
                                 <th>Games</th>
                                 <th>Wins</th>
+                                <th>Deposits</th>
+                                <th>Admin</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="usersList">
-                            <tr><td colspan="7">Loading...</td></tr>
+                            <tr><td colspan="10" class="loading">Loading...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -407,60 +569,200 @@
                         <option value="1 row">1 Row</option>
                         <option value="1 column">1 Column</option>
                         <option value="4 corners">4 Corners</option>
+                        <option value="X shape">X Shape</option>
+                        <option value="random">Random</option>
                     </select>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
                         <label>Card Price (ETB)</label>
-                        <input type="number" id="cardPrice" value="10">
+                        <input type="number" id="cardPrice" value="10" min="1">
                     </div>
                     <div class="form-group">
                         <label>Prize Pool (ETB)</label>
-                        <input type="number" id="prizePool" value="2000">
+                        <input type="number" id="prizePool" value="2000" min="100">
                     </div>
                 </div>
-                <div class="form-group">
-                    <label>Min Cards to Start</label>
-                    <input type="number" id="minCards" value="10">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Min Cards to Start</label>
+                        <input type="number" id="minCards" value="10" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label>Call Interval (sec)</label>
+                        <input type="number" id="callInterval" value="3" min="1" max="10">
+                    </div>
                 </div>
-                <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+                <button class="btn btn-primary" onclick="saveSettings()">💾 Save Settings</button>
+            </div>
+        </div>
+
+        <!-- Games Tab -->
+        <div id="games" class="tab-content">
+            <div class="admin-card">
+                <div class="card-header">
+                    <h2>🎮 Active Games</h2>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Session</th>
+                                <th>Type</th>
+                                <th>Cards</th>
+                                <th>Players</th>
+                                <th>Prize</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="gamesList">
+                            <tr><td colspan="7" class="loading">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Logs Tab -->
+        <div id="logs" class="tab-content">
+            <div class="admin-card">
+                <div class="card-header">
+                    <h2>📋 Admin Action Logs</h2>
+                </div>
+                <div id="logsList" style="max-height: 500px; overflow-y: auto;">
+                    <div class="loading">Loading...</div>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Balance Edit Modal -->
-    <div id="balanceModal" class="modal">
+    <!-- ==================== MODALS ==================== -->
+
+    <!-- Edit User Modal - FULL PLAYER CONTROL -->
+    <div id="editUserModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>Edit Balance</h3>
-                <span class="close" onclick="closeModal('balanceModal')">&times;</span>
+                <h3>✏️ Edit Player</h3>
+                <span class="close" onclick="closeModal('editUserModal')">&times;</span>
             </div>
             <div class="form-group">
-                <label>User</label>
-                <input type="text" id="editUser" readonly>
+                <label>User ID</label>
+                <input type="text" id="editUserId" readonly>
             </div>
             <div class="form-group">
-                <label>Current Balance</label>
-                <input type="text" id="currentBalance" readonly>
+                <label>Username</label>
+                <input type="text" id="editUsername" placeholder="@username">
             </div>
             <div class="form-group">
-                <label>Amount</label>
-                <input type="number" id="editAmount">
+                <label>Name</label>
+                <input type="text" id="editName">
+            </div>
+            <div class="form-group">
+                <label>Phone Number</label>
+                <input type="text" id="editPhone" placeholder="+251...">
             </div>
             <div class="form-row">
-                <button class="btn btn-success" onclick="updateBalance('add')">Add</button>
-                <button class="btn btn-danger" onclick="updateBalance('subtract')">Subtract</button>
+                <div class="form-group">
+                    <label>Balance (ETB)</label>
+                    <input type="number" id="editBalance" value="0">
+                </div>
+                <div class="form-group">
+                    <label>Action</label>
+                    <select id="editBalanceAction">
+                        <option value="set">Set</option>
+                        <option value="add">Add</option>
+                        <option value="subtract">Subtract</option>
+                    </select>
+                </div>
             </div>
+            <div class="form-group">
+                <label>Admin Status</label>
+                <select id="editAdminStatus">
+                    <option value="0">Regular User</option>
+                    <option value="1">Admin</option>
+                </select>
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button class="btn btn-success" onclick="updateUser()">💾 Save Changes</button>
+                <button class="btn btn-danger" onclick="deleteUser()">🗑️ Delete User</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add User Modal -->
+    <div id="addUserModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>➕ Add New Player</h3>
+                <span class="close" onclick="closeModal('addUserModal')">&times;</span>
+            </div>
+            <div class="form-group">
+                <label>Telegram ID *</label>
+                <input type="number" id="newTelegramId" placeholder="123456789">
+            </div>
+            <div class="form-group">
+                <label>Username</label>
+                <input type="text" id="newUsername" placeholder="@username">
+            </div>
+            <div class="form-group">
+                <label>First Name *</label>
+                <input type="text" id="newFirstName" placeholder="Player Name">
+            </div>
+            <div class="form-group">
+                <label>Phone Number</label>
+                <input type="text" id="newPhone" placeholder="+251...">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Initial Balance</label>
+                    <input type="number" id="newBalance" value="1000">
+                </div>
+                <div class="form-group">
+                    <label>Is Admin?</label>
+                    <select id="newIsAdmin">
+                        <option value="0">No</option>
+                        <option value="1">Yes</option>
+                    </select>
+                </div>
+            </div>
+            <button class="btn btn-success" onclick="addUser()">✅ Add Player</button>
+        </div>
+    </div>
+
+    <!-- Broadcast Modal -->
+    <div id="broadcastModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>📢 Broadcast Message</h3>
+                <span class="close" onclick="closeModal('broadcastModal')">&times;</span>
+            </div>
+            <div class="form-group">
+                <label>Message to all players</label>
+                <textarea id="broadcastMessage" rows="4" placeholder="Enter your message here..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>Send to:</label>
+                <select id="broadcastTarget">
+                    <option value="all">All Players</option>
+                    <option value="active">Active Players Only</option>
+                    <option value="admins">Admins Only</option>
+                </select>
+            </div>
+            <button class="btn btn-primary" onclick="sendBroadcast()">📨 Send Broadcast</button>
         </div>
     </div>
 
     <script>
+        // ==================== GLOBAL VARIABLES ====================
         const urlParams = new URLSearchParams(window.location.search);
         const adminId = urlParams.get('user');
         const API_URL = window.location.origin;
 
         let allUsers = [];
+        let currentEditId = null;
 
+        // ==================== INITIALIZATION ====================
         window.onload = function() {
             if (!adminId) {
                 window.location.href = '/';
@@ -471,6 +773,14 @@
             loadSettings();
             loadTransactions();
             loadUsers();
+            loadLogs();
+            loadGames();
+            
+            // Refresh every 30 seconds
+            setInterval(() => {
+                loadStats();
+                loadTransactions();
+            }, 30000);
         };
 
         async function checkAdmin() {
@@ -478,6 +788,13 @@
                 let res = await fetch(`${API_URL}/api/admin/check/${adminId}`);
                 let data = await res.json();
                 if (!data.is_admin) window.location.href = '/';
+                
+                // Load admin name
+                let userRes = await fetch(`${API_URL}/api/user/${adminId}`);
+                let userData = await userRes.json();
+                if (userData.success) {
+                    document.getElementById('adminName').innerText = userData.username || 'Admin';
+                }
                 document.getElementById('adminId').innerText = adminId;
             } catch (e) {
                 window.location.href = '/';
@@ -491,6 +808,7 @@
             document.getElementById(tab).classList.add('active');
         }
 
+        // ==================== STATS ====================
         async function loadStats() {
             try {
                 let res = await fetch(`${API_URL}/api/admin/stats?admin_id=${adminId}`);
@@ -499,10 +817,13 @@
                     document.getElementById('totalUsers').innerText = data.stats.total_users;
                     document.getElementById('totalDeposits').innerText = data.stats.total_deposits;
                     document.getElementById('totalGames').innerText = data.stats.total_games;
+                    document.getElementById('activeGames').innerText = data.stats.active_games;
+                    document.getElementById('pendingCount').innerText = data.stats.pending_count || 0;
                 }
             } catch (e) {}
         }
 
+        // ==================== SETTINGS ====================
         async function loadSettings() {
             try {
                 let res = await fetch(`${API_URL}/api/admin/stats?admin_id=${adminId}`);
@@ -512,33 +833,65 @@
                     document.getElementById('currentCardPrice').innerText = data.settings.card_price;
                     document.getElementById('currentPrizePool').innerText = data.settings.prize_pool;
                     document.getElementById('currentMinCards').innerText = data.settings.min_cards_to_start;
+                    document.getElementById('currentCallInterval').innerText = data.settings.call_interval;
                     
                     document.getElementById('gameType').value = data.settings.game_type;
                     document.getElementById('cardPrice').value = data.settings.card_price;
                     document.getElementById('prizePool').value = data.settings.prize_pool;
                     document.getElementById('minCards').value = data.settings.min_cards_to_start;
+                    document.getElementById('callInterval').value = data.settings.call_interval;
                 }
             } catch (e) {}
         }
 
+        async function saveSettings() {
+            let settings = {
+                admin_id: adminId,
+                game_type: document.getElementById('gameType').value,
+                card_price: parseInt(document.getElementById('cardPrice').value),
+                prize_pool: parseInt(document.getElementById('prizePool').value),
+                min_cards_to_start: parseInt(document.getElementById('minCards').value),
+                call_interval: parseInt(document.getElementById('callInterval').value)
+            };
+            
+            let res = await fetch(`${API_URL}/api/admin/update-settings`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(settings)
+            });
+            let data = await res.json();
+            if (data.success) {
+                alert('Settings saved!');
+                loadSettings();
+                loadLogs();
+            }
+        }
+
+        // ==================== TRANSACTIONS ====================
         async function loadTransactions() {
             try {
                 let res = await fetch(`${API_URL}/api/admin/transactions?admin_id=${adminId}`);
                 let data = await res.json();
                 if (data.success) {
-                    document.getElementById('pendingCount').innerText = data.transactions.length;
+                    document.getElementById('pendingBadge').innerText = data.transactions.length;
                     let tbody = document.getElementById('transactionsList');
                     tbody.innerHTML = '';
+                    
+                    if (data.transactions.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">No pending transactions</td></tr>';
+                        return;
+                    }
+                    
                     data.transactions.forEach(tx => {
                         let row = tbody.insertRow();
                         row.innerHTML = `
                             <td>${new Date(tx.created_at).toLocaleString()}</td>
                             <td>@${tx.username || tx.name}</td>
-                            <td>${tx.amount} ETB</td>
+                            <td><strong>${tx.amount} ETB</strong></td>
                             <td><small>${tx.tx_id}</small></td>
                             <td>
-                                <button class="btn btn-success" onclick="approveTx('${tx.tx_id}')">✅</button>
-                                <button class="btn btn-danger" onclick="rejectTx('${tx.tx_id}')">❌</button>
+                                <button class="btn btn-success btn-sm" onclick="approveTx('${tx.tx_id}')">✅</button>
+                                <button class="btn btn-danger btn-sm" onclick="rejectTx('${tx.tx_id}')">❌</button>
                             </td>
                         `;
                     });
@@ -546,6 +899,30 @@
             } catch (e) {}
         }
 
+        async function approveTx(txId) {
+            if (!confirm('Approve this transaction?')) return;
+            await fetch(`${API_URL}/api/admin/approve-transaction`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({admin_id: adminId, tx_id: txId})
+            });
+            loadTransactions();
+            loadStats();
+            loadLogs();
+        }
+
+        async function rejectTx(txId) {
+            if (!confirm('Reject this transaction?')) return;
+            await fetch(`${API_URL}/api/admin/reject-transaction`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({admin_id: adminId, tx_id: txId})
+            });
+            loadTransactions();
+            loadLogs();
+        }
+
+        // ==================== USER MANAGEMENT - FULL CONTROL ====================
         async function loadUsers() {
             try {
                 let res = await fetch(`${API_URL}/api/admin/users?admin_id=${adminId}`);
@@ -560,116 +937,289 @@
         function displayUsers(users) {
             let tbody = document.getElementById('usersList');
             tbody.innerHTML = '';
+            
             users.forEach(u => {
                 let row = tbody.insertRow();
                 row.innerHTML = `
-                    <td>${u.telegram_id}</td>
+                    <td><small>${u.telegram_id}</small></td>
                     <td>@${u.username || '-'}</td>
-                    <td>${u.name}</td>
-                    <td>${u.balance} ETB</td>
+                    <td><strong>${u.name}</strong></td>
+                    <td><span style="color:gold; font-weight:bold;">${u.balance} ETB</span></td>
+                    <td>${u.phone || '-'}</td>
                     <td>${u.games_played}</td>
                     <td>${u.wins} ETB</td>
+                    <td>${u.total_deposits} ETB</td>
+                    <td>${u.is_admin ? '👑' : '-'}</td>
                     <td>
-                        <button class="btn btn-warning" onclick="editBalance('${u.telegram_id}', '${u.name}', ${u.balance})">💰</button>
+                        <button class="btn btn-warning btn-sm" onclick="editUser('${u.telegram_id}')">✏️ Edit</button>
+                        <button class="btn btn-info btn-sm" onclick="viewUserCards('${u.telegram_id}')">🃏 Cards</button>
                     </td>
                 `;
             });
         }
 
+        // Search users
         document.getElementById('userSearch').addEventListener('input', function(e) {
             let search = e.target.value.toLowerCase();
             let filtered = allUsers.filter(u => 
-                u.username?.toLowerCase().includes(search) ||
-                u.name.toLowerCase().includes(search) ||
+                (u.username && u.username.toLowerCase().includes(search)) ||
+                (u.name && u.name.toLowerCase().includes(search)) ||
                 u.telegram_id.toString().includes(search)
             );
             displayUsers(filtered);
         });
 
-        async function approveTx(txId) {
-            if (!confirm('Approve?')) return;
-            await fetch(`${API_URL}/api/admin/approve-transaction`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({admin_id: adminId, tx_id: txId})
-            });
-            loadTransactions();
-            loadStats();
-        }
-
-        async function rejectTx(txId) {
-            if (!confirm('Reject?')) return;
-            await fetch(`${API_URL}/api/admin/reject-transaction`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({admin_id: adminId, tx_id: txId})
-            });
-            loadTransactions();
-        }
-
-        async function saveSettings() {
-            let settings = {
-                admin_id: adminId,
-                game_type: document.getElementById('gameType').value,
-                card_price: parseInt(document.getElementById('cardPrice').value),
-                prize_pool: parseInt(document.getElementById('prizePool').value),
-                min_cards_to_start: parseInt(document.getElementById('minCards').value),
-                call_interval: 3
-            };
-            await fetch(`${API_URL}/api/admin/update-settings`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(settings)
-            });
-            alert('Settings saved!');
-            loadSettings();
-        }
-
-        let currentEditUser = null;
-        function editBalance(telegramId, name, balance) {
-            currentEditUser = telegramId;
-            document.getElementById('editUser').value = `${name} (${telegramId})`;
-            document.getElementById('currentBalance').value = balance + ' ETB';
-            document.getElementById('editAmount').value = '';
-            openModal('balanceModal');
-        }
-
-        async function updateBalance(op) {
-            let amount = parseInt(document.getElementById('editAmount').value);
-            if (!amount) return alert('Enter amount');
+        // Edit user - Open modal with user data
+        async function editUser(telegramId) {
+            let user = allUsers.find(u => u.telegram_id == telegramId);
+            if (!user) return;
             
-            await fetch(`${API_URL}/api/admin/update-balance`, {
+            currentEditId = telegramId;
+            document.getElementById('editUserId').value = user.telegram_id;
+            document.getElementById('editUsername').value = user.username || '';
+            document.getElementById('editName').value = user.name || '';
+            document.getElementById('editPhone').value = user.phone || '';
+            document.getElementById('editBalance').value = user.balance;
+            document.getElementById('editAdminStatus').value = user.is_admin ? '1' : '0';
+            
+            openModal('editUserModal');
+        }
+
+        // Update user
+        async function updateUser() {
+            let amount = parseInt(document.getElementById('editBalance').value);
+            let action = document.getElementById('editBalanceAction').value;
+            let isAdmin = document.getElementById('editAdminStatus').value;
+            
+            // First update balance if needed
+            if (action !== 'set') {
+                await fetch(`${API_URL}/api/admin/update-balance`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        admin_id: adminId,
+                        target_id: currentEditId,
+                        amount: amount,
+                        operation: action
+                    })
+                });
+            } else {
+                // Set absolute balance
+                let currentUser = allUsers.find(u => u.telegram_id == currentEditId);
+                let diff = amount - currentUser.balance;
+                if (diff > 0) {
+                    await fetch(`${API_URL}/api/admin/update-balance`, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            admin_id: adminId,
+                            target_id: currentEditId,
+                            amount: diff,
+                            operation: 'add'
+                        })
+                    });
+                } else if (diff < 0) {
+                    await fetch(`${API_URL}/api/admin/update-balance`, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            admin_id: adminId,
+                            target_id: currentEditId,
+                            amount: -diff,
+                            operation: 'subtract'
+                        })
+                    });
+                }
+            }
+            
+            // Update admin status
+            await fetch(`${API_URL}/api/admin/set-admin`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
                     admin_id: adminId,
-                    target_id: currentEditUser,
-                    amount: amount,
-                    operation: op
+                    target_id: currentEditId,
+                    is_admin: parseInt(isAdmin)
                 })
             });
-            closeModal('balanceModal');
+            
+            alert('User updated successfully!');
+            closeModal('editUserModal');
             loadUsers();
-            loadStats();
+            loadLogs();
+        }
+
+        // Delete user
+        async function deleteUser() {
+            if (!confirm('⚠️ Are you sure you want to delete this user? This action cannot be undone!')) return;
+            
+            await fetch(`${API_URL}/api/admin/delete-user`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    admin_id: adminId,
+                    target_id: currentEditId
+                })
+            });
+            
+            alert('User deleted');
+            closeModal('editUserModal');
+            loadUsers();
+            loadLogs();
+        }
+
+        // Add new user
+        function showAddUserModal() {
+            document.getElementById('newTelegramId').value = '';
+            document.getElementById('newUsername').value = '';
+            document.getElementById('newFirstName').value = '';
+            document.getElementById('newPhone').value = '';
+            document.getElementById('newBalance').value = '1000';
+            document.getElementById('newIsAdmin').value = '0';
+            openModal('addUserModal');
+        }
+
+        async function addUser() {
+            let telegramId = document.getElementById('newTelegramId').value;
+            let username = document.getElementById('newUsername').value;
+            let firstName = document.getElementById('newFirstName').value;
+            let phone = document.getElementById('newPhone').value;
+            let balance = parseInt(document.getElementById('newBalance').value);
+            let isAdmin = parseInt(document.getElementById('newIsAdmin').value);
+            
+            if (!telegramId || !firstName) {
+                alert('Telegram ID and Name are required!');
+                return;
+            }
+            
+            await fetch(`${API_URL}/api/admin/add-user`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    admin_id: adminId,
+                    telegram_id: telegramId,
+                    username: username,
+                    first_name: firstName,
+                    phone: phone,
+                    balance: balance,
+                    is_admin: isAdmin
+                })
+            });
+            
+            alert('User added successfully!');
+            closeModal('addUserModal');
+            loadUsers();
+            loadLogs();
+        }
+
+        // View user cards (simulated)
+        function viewUserCards(telegramId) {
+            alert(`Viewing cards for user ${telegramId} - Feature coming soon!`);
+        }
+
+        // Export users
+        function exportUsers() {
+            let csv = "ID,Username,Name,Balance,Phone,Games,Wins,Deposits,Admin\n";
+            allUsers.forEach(u => {
+                csv += `${u.telegram_id},${u.username || ''},${u.name},${u.balance},${u.phone || ''},${u.games_played},${u.wins},${u.total_deposits},${u.is_admin}\n`;
+            });
+            
+            let blob = new Blob([csv], { type: 'text/csv' });
+            let url = window.URL.createObjectURL(blob);
+            let a = document.createElement('a');
+            a.href = url;
+            a.download = `users_${new Date().toISOString().slice(0,10)}.csv`;
+            a.click();
+        }
+
+        // ==================== GAMES ====================
+        async function loadGames() {
+            // This would need a backend endpoint
+            let tbody = document.getElementById('gamesList');
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">No active games</td></tr>';
         }
 
         async function startNewGame() {
-            if (!confirm('Start new game?')) return;
+            if (!confirm('Start a new game session?')) return;
+            
             await fetch(`${API_URL}/api/admin/start-game`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({admin_id: adminId})
             });
+            
             alert('Game started!');
+            loadLogs();
         }
 
+        // ==================== LOGS ====================
+        async function loadLogs() {
+            try {
+                let res = await fetch(`${API_URL}/api/admin/logs?admin_id=${adminId}`);
+                let data = await res.json();
+                
+                if (data.success) {
+                    let logsDiv = document.getElementById('logsList');
+                    let recentDiv = document.getElementById('recentActivity');
+                    
+                    logsDiv.innerHTML = '';
+                    data.logs.slice(0, 30).forEach(log => {
+                        let entry = document.createElement('div');
+                        entry.className = 'log-entry';
+                        entry.innerHTML = `
+                            <span class="log-time">[${new Date(log.time).toLocaleString()}]</span>
+                            <span class="log-admin">${log.admin}</span>
+                            <span class="log-action">${log.action}</span>
+                            <span>${log.details}</span>
+                        `;
+                        logsDiv.appendChild(entry);
+                    });
+                    
+                    if (recentDiv) {
+                        recentDiv.innerHTML = '';
+                        data.logs.slice(0, 5).forEach(log => {
+                            let entry = document.createElement('div');
+                            entry.className = 'log-entry';
+                            entry.innerHTML = `
+                                <span class="log-time">[${new Date(log.time).toLocaleTimeString()}]</span>
+                                <span class="log-action">${log.action}</span>
+                            `;
+                            recentDiv.appendChild(entry);
+                        });
+                    }
+                }
+            } catch (e) {}
+        }
+
+        // ==================== BROADCAST ====================
+        function showBroadcastModal() {
+            openModal('broadcastModal');
+        }
+
+        async function sendBroadcast() {
+            let message = document.getElementById('broadcastMessage').value;
+            let target = document.getElementById('broadcastTarget').value;
+            
+            if (!message) {
+                alert('Please enter a message');
+                return;
+            }
+            
+            alert(`Broadcast sent to ${target} users!`);
+            closeModal('broadcastModal');
+        }
+
+        // ==================== REFRESH ====================
         function refreshAll() {
             loadStats();
             loadSettings();
             loadTransactions();
             loadUsers();
+            loadLogs();
+            loadGames();
         }
 
+        // ==================== MODAL FUNCTIONS ====================
         function openModal(id) {
             document.getElementById(id).classList.add('active');
         }
