@@ -84,7 +84,6 @@ def init_db():
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   game_type TEXT DEFAULT 'full house',
                   card_price INTEGER DEFAULT 10,
-                  prize_pool INTEGER DEFAULT 2000,
                   min_cards_to_start INTEGER DEFAULT 10,
                   call_interval INTEGER DEFAULT 3,
                   house_fee REAL DEFAULT 5,
@@ -95,9 +94,9 @@ def init_db():
     c.execute("SELECT COUNT(*) FROM game_settings")
     if c.fetchone()[0] == 0:
         c.execute('''INSERT INTO game_settings 
-                     (game_type, card_price, prize_pool, min_cards_to_start, call_interval, house_fee) 
-                     VALUES (?, ?, ?, ?, ?, ?)''',
-                  ('full house', 10, 2000, 10, 3, 5))
+                     (game_type, card_price, min_cards_to_start, call_interval, house_fee) 
+                     VALUES (?, ?, ?, ?, ?)''',
+                  ('full house', 10, 10, 3, 5))
     
     # Game sessions table
     c.execute('''CREATE TABLE IF NOT EXISTS game_sessions
@@ -111,8 +110,6 @@ def init_db():
                   status TEXT DEFAULT 'waiting',
                   started_at TIMESTAMP,
                   ended_at TIMESTAMP,
-                  winner_id INTEGER,
-                  winning_card TEXT,
                   house_fee REAL DEFAULT 5,
                   house_collected INTEGER DEFAULT 0)''')
     
@@ -125,6 +122,7 @@ def init_db():
                   cards_bought INTEGER,
                   paid_amount INTEGER,
                   has_bingo BOOLEAN DEFAULT 0,
+                  prize_won INTEGER DEFAULT 0,
                   joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                   FOREIGN KEY (user_id) REFERENCES users(id),
                   FOREIGN KEY (session_id) REFERENCES game_sessions(session_id))''')
@@ -149,6 +147,7 @@ def init_db():
                   fee_percentage REAL,
                   house_amount INTEGER,
                   players_prize INTEGER,
+                  winner_count INTEGER,
                   game_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     
     conn.commit()
@@ -425,8 +424,8 @@ def create_game_session(settings):
     
     return session_id
 
-def end_game_session(session_id, winner_id, winning_card):
-    """End a game session and calculate house fee"""
+def end_game_session(session_id, winner_ids):
+    """End a game session and distribute prizes to winners ONLY"""
     conn = sqlite3.connect('database/bingo.db')
     c = conn.cursor()
     
@@ -436,22 +435,48 @@ def end_game_session(session_id, winner_id, winning_card):
     
     if session:
         total_cards, card_price, house_fee = session
-        total_prize = total_cards * card_price  # Prize Pool = Total Cards × Card Price
-        house_amount = int(total_prize * house_fee / 100)
-        players_prize = total_prize - house_amount
+        total_prize = total_cards * card_price  # Total prize pool from card sales
+        house_amount = int(total_prize * house_fee / 100)  # House fee
+        players_prize = total_prize - house_amount  # Prize for players
+        
+        # Prize per winner (split equally among winners)
+        winner_count = len(winner_ids)
+        prize_per_winner = players_prize // winner_count if winner_count > 0 else 0
         
         # Update session
         c.execute('''UPDATE game_sessions 
-                     SET status = 'ended', ended_at = ?, winner_id = ?, 
-                         winning_card = ?, prize_pool = ?, house_collected = ?
+                     SET status = 'ended', ended_at = ?, 
+                         prize_pool = ?, house_collected = ?
                      WHERE session_id = ?''',
-                  (datetime.now(), winner_id, winning_card, total_prize, house_amount, session_id))
+                  (datetime.now(), total_prize, house_amount, session_id))
         
         # Add to house fee history
         c.execute('''INSERT INTO house_fee_history 
-                     (session_id, total_cards, card_price, total_prize, fee_percentage, house_amount, players_prize) 
-                     VALUES (?, ?, ?, ?, ?, ?, ?)''',
-                  (session_id, total_cards, card_price, total_prize, house_fee, house_amount, players_prize))
+                     (session_id, total_cards, card_price, total_prize, 
+                      fee_percentage, house_amount, players_prize, winner_count) 
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
+                  (session_id, total_cards, card_price, total_prize, 
+                   house_fee, house_amount, players_prize, winner_count))
+        
+        # Update winners' balances (add prize money)
+        for winner_id in winner_ids:
+            # Get user's database id
+            c.execute("SELECT id FROM users WHERE telegram_id = ?", (winner_id,))
+            user_result = c.fetchone()
+            if user_result:
+                user_db_id = user_result[0]
+                # Add prize to winner's balance
+                c.execute("UPDATE users SET balance = balance + ?, wins = wins + ? WHERE id = ?",
+                         (prize_per_winner, prize_per_winner, user_db_id))
+                
+                # Record win in game participants
+                c.execute('''UPDATE game_participants 
+                             SET has_bingo = 1, prize_won = ? 
+                             WHERE session_id = ? AND user_id = ?''',
+                          (prize_per_winner, session_id, user_db_id))
+        
+        logger.info(f"Game {session_id} ended. House: {house_amount} ETB, "
+                   f"Players: {players_prize} ETB split among {winner_count} winners")
     
     conn.commit()
     conn.close()
@@ -972,6 +997,8 @@ def purchase_cards_api():
 @application.route('/api/game/session')
 def get_game_session():
     """Get current game session info"""
+    user_id = request.args.get('user_id')
+    
     conn = sqlite3.connect('database/bingo.db')
     c = conn.cursor()
     
@@ -990,6 +1017,17 @@ def get_game_session():
                      WHERE p.session_id = ?''', (session[0],))
         players = [{'id': row[0], 'name': row[1], 'cards': row[2]} for row in c.fetchall()]
         
+        # Check if user is in this game
+        in_game = False
+        my_cards = []
+        if user_id:
+            c.execute("SELECT cards FROM game_participants WHERE session_id = ? AND user_id = (SELECT id FROM users WHERE telegram_id = ?)", 
+                     (session[0], user_id))
+            result = c.fetchone()
+            if result:
+                in_game = True
+                my_cards = json.loads(result[0]) if result[0] else []
+        
         conn.close()
         return jsonify({
             'success': True,
@@ -1000,7 +1038,9 @@ def get_game_session():
             'prize_pool': prize_pool,
             'status': session[4],
             'house_fee': session[5],
-            'players': players
+            'players': players,
+            'in_game': in_game,
+            'my_cards': my_cards
         })
     else:
         conn.close()
@@ -1009,7 +1049,8 @@ def get_game_session():
             'total_cards_sold': 0,
             'total_players': 0,
             'prize_pool': 0,
-            'status': 'no_session'
+            'status': 'no_session',
+            'in_game': False
         })
 
 @application.route('/api/game/join', methods=['POST'])
@@ -1082,6 +1123,23 @@ def join_game():
         'prize_pool': prize_pool,
         'game_ready': updated[0] >= settings['min_cards_to_start']
     })
+
+@application.route('/api/game/end', methods=['POST'])
+def end_game():
+    """End the game and distribute prizes to winners ONLY"""
+    data = request.json
+    session_id = data.get('session_id')
+    winners = data.get('winners', [])
+    
+    if not session_id:
+        return jsonify({'success': False, 'error': 'Missing session_id'}), 400
+    
+    if not winners:
+        return jsonify({'success': False, 'error': 'No winners specified'}), 400
+    
+    end_game_session(session_id, winners)
+    
+    return jsonify({'success': True})
 
 # ==================== ADMIN ROUTES ====================
 
@@ -1390,28 +1448,6 @@ def admin_start_game():
     
     return jsonify({'success': True, 'session_id': session_id})
 
-@application.route('/api/admin/end-game', methods=['POST'])
-def admin_end_game():
-    """End current game session"""
-    data = request.json
-    admin_id = data.get('admin_id')
-    session_id = data.get('session_id')
-    winner_id = data.get('winner_id')
-    winning_card = data.get('winning_card')
-    
-    if not admin_id or not session_id:
-        return jsonify({'success': False, 'error': 'Missing data'}), 400
-    
-    user = get_user(int(admin_id))
-    if not user or not user['is_admin']:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
-    
-    end_game_session(session_id, winner_id, winning_card)
-    
-    log_admin_action(user['id'], 'end_game', f'Session {session_id} - Winner: {winner_id}')
-    
-    return jsonify({'success': True})
-
 @application.route('/api/admin/logs')
 def admin_logs():
     """Get admin action logs"""
@@ -1458,7 +1494,7 @@ def house_fee_history():
     
     conn = sqlite3.connect('database/bingo.db')
     c = conn.cursor()
-    c.execute('''SELECT session_id, total_cards, card_price, total_prize, fee_percentage, house_amount, players_prize, game_date 
+    c.execute('''SELECT session_id, total_cards, card_price, total_prize, fee_percentage, house_amount, players_prize, winner_count, game_date 
                  FROM house_fee_history ORDER BY game_date DESC LIMIT 20''')
     history = c.fetchall()
     conn.close()
@@ -1473,7 +1509,8 @@ def house_fee_history():
             'fee_percentage': h[4],
             'house_amount': h[5],
             'players_prize': h[6],
-            'game_date': h[7]
+            'winner_count': h[7],
+            'game_date': h[8]
         })
     
     return jsonify({'success': True, 'history': result})
