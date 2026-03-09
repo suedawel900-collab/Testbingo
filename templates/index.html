@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MK BINGO</title>
+    <title>MK BINGO - Card Selection</title>
     <style>
         * {
             box-sizing: border-box;
@@ -34,16 +34,40 @@
             border: 2px solid gold;
         }
         .balance span { color: gold; font-size: 1.5em; font-weight: bold; }
+        
+        /* Range Selector */
+        .range-selector {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin: 15px 0;
+        }
+        .range-btn {
+            padding: 8px 12px;
+            background: rgba(255,215,0,0.2);
+            border: 1px solid gold;
+            border-radius: 20px;
+            color: white;
+            cursor: pointer;
+        }
+        .range-btn:hover {
+            background: gold;
+            color: black;
+        }
+        
+        /* Card Grid */
+        .grid-container {
+            background: rgba(0,0,0,0.3);
+            border-radius: 15px;
+            padding: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
         #grid {
             display: grid;
             grid-template-columns: repeat(20, 1fr);
             gap: 2px;
-            max-height: 300px;
-            overflow-y: auto;
-            background: rgba(0,0,0,0.3);
-            padding: 10px;
-            border-radius: 10px;
-            margin: 10px 0;
         }
         .box {
             background: white;
@@ -85,6 +109,8 @@
             border-color: gold;
             cursor: default;
         }
+        
+        /* Summary Bar */
         .summary-bar {
             display: flex;
             justify-content: space-between;
@@ -93,6 +119,8 @@
             border-radius: 20px;
             margin: 10px 0;
         }
+        
+        /* Buttons */
         button {
             padding: 10px 20px;
             border: none;
@@ -104,7 +132,13 @@
             margin: 5px;
         }
         .cancel-btn { background: #f44336; }
-        #message {
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        /* Message */
+        .message-box {
             position: fixed;
             top: 20px;
             left: 50%;
@@ -117,6 +151,25 @@
             display: none;
             z-index: 1000;
         }
+        
+        /* Legend */
+        .legend {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin: 10px 0;
+            font-size: 0.8em;
+            flex-wrap: wrap;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .color-available { width: 20px; height: 20px; background: white; border: 2px solid #4CAF50; }
+        .color-selected { width: 20px; height: 20px; background: #4CAF50; border: 2px solid gold; }
+        .color-purchased { width: 20px; height: 20px; background: #ccc; border: 2px solid #f44336; position: relative; }
+        .color-purchased::after { content: "❌"; position: absolute; top: -5px; right: -5px; font-size: 8px; }
     </style>
 </head>
 <body>
@@ -127,12 +180,20 @@
             <span id="playerBalance">{{ balance|default('1000') }}</span> ETB
         </div>
 
+        <div class="legend">
+            <div class="legend-item"><div class="color-available"></div><span>Available</span></div>
+            <div class="legend-item"><div class="color-selected"></div><span>Selected</span></div>
+            <div class="legend-item"><div class="color-purchased"></div><span>Sold</span></div>
+        </div>
+
         <div id="selectPage">
             <h3 style="text-align: center;">Select Cards (1-1000)</h3>
             
-            <div style="display: flex; gap: 5px; flex-wrap: wrap; justify-content: center; margin: 10px 0;" id="rangeSelector"></div>
+            <div class="range-selector" id="rangeSelector"></div>
             
-            <div id="grid"></div>
+            <div class="grid-container">
+                <div id="grid"></div>
+            </div>
 
             <div class="summary-bar">
                 <span>Your Cards: <span id="selectedCount">0</span></span>
@@ -144,25 +205,9 @@
                 <button class="cancel-btn" onclick="cancelSelection()">❌ CLEAR</button>
             </div>
         </div>
-
-        <div id="waitingPage" style="display: none;">
-            <div style="text-align: center; padding: 30px;">
-                <h2 style="color: gold;">⏳ WAITING FOR PLAYERS</h2>
-                <div style="font-size: 2em;" id="waitingCards">0/10 Cards</div>
-                <div id="waitingPlayers"></div>
-                <button onclick="leaveGame()" style="margin-top: 20px;">🔙 LEAVE</button>
-            </div>
-        </div>
-
-        <div id="gamePage" style="display: none;">
-            <div style="text-align: center;">
-                <h2>🎯 GAME STARTED!</h2>
-                <div id="gameCards"></div>
-            </div>
-        </div>
     </div>
 
-    <div id="message"></div>
+    <div id="message" class="message-box"></div>
 
     <script>
         let selectedCards = {};
@@ -170,9 +215,13 @@
         let userId = "{{ user_id|default('guest') }}";
         let purchasedCards = new Set();
         let myCards = new Set();
-        let currentSession = null;
         
         const API_URL = window.location.origin;
+
+        // Check if user is guest - show warning
+        if (userId === 'guest') {
+            showMessage('⚠️ You are in guest mode. Use Telegram to play with real balance!');
+        }
 
         window.onload = function() {
             createGrid();
@@ -185,13 +234,12 @@
             let ranges = [[1,200], [201,400], [401,600], [601,800], [801,1000]];
             ranges.forEach(r => {
                 let btn = document.createElement('button');
-                btn.style.padding = '5px 10px';
-                btn.style.background = 'rgba(255,215,0,0.2)';
-                btn.style.border = '1px solid gold';
-                btn.style.borderRadius = '15px';
-                btn.style.color = 'white';
+                btn.className = 'range-btn';
                 btn.innerText = r[0] + '-' + r[1];
-                btn.onclick = () => document.getElementById(`card-${r[0]}`).scrollIntoView();
+                btn.onclick = () => {
+                    let firstCard = document.getElementById(`card-${r[0]}`);
+                    if (firstCard) firstCard.scrollIntoView({behavior: 'smooth'});
+                };
                 selector.appendChild(btn);
             });
         }
@@ -210,44 +258,63 @@
 
         async function loadCardStatus() {
             try {
-                let res = await fetch(`${API_URL}/api/cards/status?user_id=${userId}`);
+                let url = `${API_URL}/api/cards/status`;
+                if (userId !== 'guest') {
+                    url += `?user_id=${userId}`;
+                }
+                let res = await fetch(url);
                 let data = await res.json();
                 if (data.success) {
                     purchasedCards = new Set(data.purchased);
                     myCards = new Set(data.my_cards);
                     updateGridDisplay();
                 }
-            } catch (e) {}
+            } catch (e) {
+                console.log('Error loading cards:', e);
+            }
         }
 
         function updateGridDisplay() {
             for (let i = 1; i <= 1000; i++) {
                 let box = document.getElementById(`card-${i}`);
                 if (!box) continue;
-                if (myCards.has(i)) box.className = 'box own-purchased';
-                else if (purchasedCards.has(i)) box.className = 'box purchased';
-                else if (selectedCards[i]) box.className = 'box selected';
-                else box.className = 'box available';
+                if (myCards.has(i)) {
+                    box.className = 'box own-purchased';
+                } else if (purchasedCards.has(i)) {
+                    box.className = 'box purchased';
+                } else if (selectedCards[i]) {
+                    box.className = 'box selected';
+                } else {
+                    box.className = 'box available';
+                }
             }
         }
 
         function handleCardClick(num, box) {
+            // Guest users cannot select cards
+            if (userId === 'guest') {
+                showMessage('❌ Please use Telegram to play the game!');
+                return;
+            }
+            
             if (purchasedCards.has(num) && !myCards.has(num)) {
-                showMessage('Card already purchased!');
+                showMessage('❌ Card already purchased!');
                 return;
             }
             if (myCards.has(num)) {
-                showMessage('You already own this card!');
+                showMessage('ℹ️ You already own this card!');
                 return;
             }
             
             if (selectedCards[num]) {
                 delete selectedCards[num];
-                box.className = 'box available';
+                if (!purchasedCards.has(num)) {
+                    box.className = 'box available';
+                }
             } else {
                 let total = (Object.keys(selectedCards).length + 1) * 10;
                 if (total > playerBalance) {
-                    showMessage('Insufficient balance!');
+                    showMessage('❌ Insufficient balance!');
                     return;
                 }
                 selectedCards[num] = true;
@@ -271,8 +338,17 @@
         }
 
         async function confirmCards() {
+            // Guest users cannot purchase
+            if (userId === 'guest') {
+                showMessage('❌ Please use Telegram to play!');
+                return;
+            }
+            
             let cards = Object.keys(selectedCards).map(Number);
-            if (cards.length === 0) return showMessage('Select cards!');
+            if (cards.length === 0) {
+                showMessage('❌ Select cards first!');
+                return;
+            }
             
             let total = cards.length * 10;
             
@@ -288,6 +364,7 @@
                 });
                 
                 let data = await res.json();
+                
                 if (data.success) {
                     playerBalance = data.new_balance;
                     document.getElementById('playerBalance').innerText = playerBalance;
@@ -301,31 +378,31 @@
                     updateGridDisplay();
                     updateSummary();
                     
-                    currentSession = data.session_id;
-                    showWaitingPage(data);
+                    showMessage(`✅ Successfully purchased ${cards.length} cards!`);
+                    
+                    // Redirect to waiting page or game
+                    setTimeout(() => {
+                        window.location.href = `/game?user=${userId}`;
+                    }, 2000);
+                    
                 } else {
-                    showMessage(data.error || 'Purchase failed');
+                    showMessage(`❌ ${data.error || 'Purchase failed'}`);
+                    if (data.conflicts) {
+                        console.log('Conflicts:', data.conflicts);
+                    }
                 }
             } catch (e) {
-                showMessage('Error purchasing cards');
+                showMessage('❌ Error purchasing cards');
+                console.error(e);
             }
         }
 
         function cancelSelection() {
-            selectedCards = {};
-            updateGridDisplay();
-            updateSummary();
-        }
-
-        function showWaitingPage(data) {
-            document.getElementById('selectPage').style.display = 'none';
-            document.getElementById('waitingPage').style.display = 'block';
-            document.getElementById('waitingCards').innerText = `${data.total_cards_sold}/10 Cards`;
-        }
-
-        function leaveGame() {
-            document.getElementById('selectPage').style.display = 'block';
-            document.getElementById('waitingPage').style.display = 'none';
+            if (Object.keys(selectedCards).length > 0 && confirm('Clear all selections?')) {
+                selectedCards = {};
+                updateGridDisplay();
+                updateSummary();
+            }
         }
     </script>
 </body>
