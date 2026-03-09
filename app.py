@@ -6,6 +6,7 @@ import json
 import uuid
 from datetime import datetime
 from flask import Flask, request, jsonify, render_template
+from functools import wraps
 
 # Setup logging
 logging.basicConfig(
@@ -29,13 +30,46 @@ logger.info(f"Starting with BOT_TOKEN: {BOT_TOKEN[:5] if BOT_TOKEN else 'None'}.
 logger.info(f"APP_URL: {APP_URL}")
 logger.info(f"ADMIN_ID: {ADMIN_ID}")
 
+# ==================== DATABASE CONNECTION ====================
+# Use a timeout and WAL mode to prevent locking
+def get_db():
+    """Get database connection with proper settings"""
+    conn = sqlite3.connect('database/bingo.db', timeout=30)
+    conn.row_factory = sqlite3.Row
+    # Enable WAL mode for better concurrency
+    conn.execute('PRAGMA journal_mode=WAL')
+    conn.execute('PRAGMA synchronous=NORMAL')
+    return conn
+
+def db_transaction(func):
+    """Decorator to handle database transactions with commit/rollback"""
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        conn = None
+        try:
+            conn = get_db()
+            result = func(conn, *args, **kwargs)
+            conn.commit()
+            return result
+        except Exception as e:
+            if conn:
+                conn.rollback()
+            logger.error(f"Database error: {e}")
+            raise
+        finally:
+            if conn:
+                conn.close()
+    return wrapper
+
 # ==================== DATABASE SETUP ====================
 def init_db():
     """Initialize database tables"""
     os.makedirs('database', exist_ok=True)
-    
-    conn = sqlite3.connect('database/bingo.db')
+    conn = get_db()
     c = conn.cursor()
+    
+    # Enable WAL mode
+    c.execute('PRAGMA journal_mode=WAL')
     
     # Users table
     c.execute('''CREATE TABLE IF NOT EXISTS users
@@ -158,7 +192,7 @@ def ensure_admin_user():
         logger.warning("No ADMIN_ID set in environment variables")
         return
     
-    conn = sqlite3.connect('database/bingo.db')
+    conn = get_db()
     c = conn.cursor()
     
     # Check if user exists
@@ -193,7 +227,8 @@ def safe_int(value, default=None):
     except (ValueError, TypeError):
         return default
 
-def get_user(telegram_id):
+@db_transaction
+def get_user(conn, telegram_id):
     """Get user by telegram ID - SAFE version that handles non-integers"""
     if telegram_id == 'guest' or telegram_id is None:
         return None
@@ -202,11 +237,9 @@ def get_user(telegram_id):
     if user_id is None:
         return None
     
-    conn = sqlite3.connect('database/bingo.db')
     c = conn.cursor()
     c.execute("SELECT * FROM users WHERE telegram_id = ?", (user_id,))
     user = c.fetchone()
-    conn.close()
     
     if user:
         return {
@@ -226,20 +259,20 @@ def get_user(telegram_id):
 
 def create_user(telegram_id, username, first_name):
     """Create new user"""
-    conn = sqlite3.connect('database/bingo.db')
+    conn = get_db()
     c = conn.cursor()
     c.execute("INSERT OR IGNORE INTO users (telegram_id, username, first_name) VALUES (?, ?, ?)",
               (telegram_id, username, first_name))
     conn.commit()
     conn.close()
 
-def update_balance(telegram_id, amount, operation='add'):
+@db_transaction
+def update_balance(conn, telegram_id, amount, operation='add'):
     """Update user balance"""
     user_id = safe_int(telegram_id)
     if user_id is None:
         return None
-        
-    conn = sqlite3.connect('database/bingo.db')
+    
     c = conn.cursor()
     
     if operation == 'add':
@@ -249,15 +282,11 @@ def update_balance(telegram_id, amount, operation='add'):
     
     c.execute("SELECT balance FROM users WHERE telegram_id = ?", (user_id,))
     result = c.fetchone()
-    new_balance = result[0] if result else None
-    conn.commit()
-    conn.close()
-    return new_balance
+    return result[0] if result else None
 
-# ==================== FIXED: RENAMED DATABASE FUNCTION ====================
-def insert_purchased_cards(user_id, card_numbers, session_id):
+@db_transaction
+def insert_purchased_cards(conn, user_id, card_numbers, session_id):
     """Insert purchased cards into database"""
-    conn = sqlite3.connect('database/bingo.db')
     c = conn.cursor()
     
     success = []
@@ -271,13 +300,11 @@ def insert_purchased_cards(user_id, card_numbers, session_id):
         except sqlite3.IntegrityError:
             failed.append(card)
     
-    conn.commit()
-    conn.close()
     return success, failed
 
-def get_purchased_cards(session_id=None):
+@db_transaction
+def get_purchased_cards(conn, session_id=None):
     """Get all purchased cards"""
-    conn = sqlite3.connect('database/bingo.db')
     c = conn.cursor()
     
     if session_id:
@@ -286,21 +313,19 @@ def get_purchased_cards(session_id=None):
         c.execute("SELECT card_number, user_id FROM purchased_cards WHERE status = 'active'")
     
     cards = {row[0]: row[1] for row in c.fetchall()}
-    conn.close()
     return cards
 
-def get_user_cards(user_id):
+@db_transaction
+def get_user_cards(conn, user_id):
     """Get cards purchased by a specific user"""
-    conn = sqlite3.connect('database/bingo.db')
     c = conn.cursor()
     c.execute("SELECT card_number FROM purchased_cards WHERE user_id = ? AND status = 'active'", (user_id,))
     cards = [row[0] for row in c.fetchall()]
-    conn.close()
     return cards
 
 def get_game_settings():
     """Get current game settings"""
-    conn = sqlite3.connect('database/bingo.db')
+    conn = get_db()
     c = conn.cursor()
     c.execute("SELECT game_type, card_price, min_cards_to_start, call_interval, house_fee FROM game_settings ORDER BY updated_at DESC LIMIT 1")
     settings = c.fetchone()
@@ -324,7 +349,7 @@ def get_game_settings():
 
 def get_pending_transactions_count():
     """Get count of pending transactions"""
-    conn = sqlite3.connect('database/bingo.db')
+    conn = get_db()
     c = conn.cursor()
     c.execute("SELECT COUNT(*) FROM transactions WHERE status = 'pending'")
     count = c.fetchone()[0]
@@ -333,7 +358,7 @@ def get_pending_transactions_count():
 
 def get_all_purchased_cards():
     """Get all purchased cards for card status"""
-    conn = sqlite3.connect('database/bingo.db')
+    conn = get_db()
     c = conn.cursor()
     c.execute("SELECT card_number, user_id FROM purchased_cards WHERE status = 'active'")
     cards = {row[0]: row[1] for row in c.fetchall()}
@@ -352,7 +377,7 @@ def game():
     balance = 1000
     
     if user_id != 'guest':
-        user = get_user(user_id)
+        user = get_user(None, user_id)  # Pass None as conn, will create new connection
         if user:
             balance = user['balance']
     
@@ -370,7 +395,7 @@ def get_user_data(telegram_id):
             'is_admin': False
         })
     
-    user = get_user(telegram_id)
+    user = get_user(None, telegram_id)
     if user:
         return jsonify({
             'success': True,
@@ -390,9 +415,9 @@ def get_card_status():
     
     my_cards = []
     if user_id != 'guest':
-        user = get_user(user_id)
+        user = get_user(None, user_id)
         if user:
-            my_cards = get_user_cards(user['id'])
+            my_cards = get_user_cards(None, user['id'])
     
     return jsonify({
         'success': True,
@@ -404,7 +429,7 @@ def get_card_status():
 @application.route('/api/game/session')
 def get_game_session():
     """Get current game session"""
-    conn = sqlite3.connect('database/bingo.db')
+    conn = get_db()
     c = conn.cursor()
     
     c.execute("SELECT session_id, total_cards_sold, total_players, card_price, status FROM game_sessions WHERE status = 'waiting' ORDER BY id DESC LIMIT 1")
@@ -465,7 +490,7 @@ def purchase_cards():
         if not isinstance(card, int) or card < 1 or card > 1000:
             return jsonify({'success': False, 'error': f'Invalid card number: {card}'}), 400
     
-    user = get_user(user_id)
+    user = get_user(None, user_id)
     if not user:
         return jsonify({'success': False, 'error': 'User not found'}), 404
     
@@ -473,68 +498,75 @@ def purchase_cards():
     if user['balance'] < total_price:
         return jsonify({'success': False, 'error': 'Insufficient balance'}), 400
     
-    # Get or create session
-    conn = sqlite3.connect('database/bingo.db')
-    c = conn.cursor()
-    
-    c.execute("SELECT session_id FROM game_sessions WHERE status = 'waiting' ORDER BY id DESC LIMIT 1")
-    session = c.fetchone()
-    
-    settings = get_game_settings()
-    
-    if not session:
-        session_id = str(uuid.uuid4())[:8]
-        c.execute('''INSERT INTO game_sessions 
-                     (session_id, game_type, card_price, status, house_fee) 
-                     VALUES (?, ?, ?, 'waiting', ?)''',
-                  (session_id, settings['game_type'], settings['card_price'], settings['house_fee']))
-    else:
-        session_id = session[0]
-    
-    # Check if cards are available in this session
-    purchased = get_purchased_cards(session_id)
-    conflicts = [c for c in cards if c in purchased]
-    
-    if conflicts:
-        conn.close()
+    # Get or create session - use a single connection for the whole transaction
+    conn = get_db()
+    try:
+        c = conn.cursor()
+        
+        c.execute("SELECT session_id FROM game_sessions WHERE status = 'waiting' ORDER BY id DESC LIMIT 1")
+        session = c.fetchone()
+        
+        settings = get_game_settings()
+        
+        if not session:
+            session_id = str(uuid.uuid4())[:8]
+            c.execute('''INSERT INTO game_sessions 
+                         (session_id, game_type, card_price, status, house_fee) 
+                         VALUES (?, ?, ?, 'waiting', ?)''',
+                      (session_id, settings['game_type'], settings['card_price'], settings['house_fee']))
+        else:
+            session_id = session[0]
+        
+        # Check if cards are available in this session
+        purchased = get_purchased_cards(conn, session_id)
+        conflicts = [c for c in cards if c in purchased]
+        
+        if conflicts:
+            conn.close()
+            return jsonify({
+                'success': False,
+                'error': 'Some cards already purchased',
+                'conflicts': conflicts
+            }), 409
+        
+        # Purchase cards
+        success, failed = insert_purchased_cards(conn, user['id'], cards, session_id)
+        
+        # Update user balance
+        new_balance = update_balance(conn, user_id, total_price, 'subtract')
+        
+        # Add to game participants
+        c.execute('''INSERT INTO game_participants 
+                     (session_id, user_id, cards, cards_bought, paid_amount) 
+                     VALUES (?, ?, ?, ?, ?)''',
+                  (session_id, user['id'], json.dumps(cards), len(cards), total_price))
+        
+        # Update session stats
+        c.execute('''UPDATE game_sessions 
+                     SET total_cards_sold = total_cards_sold + ?,
+                         total_players = total_players + 1
+                     WHERE session_id = ?''',
+                  (len(cards), session_id))
+        
+        conn.commit()
+        
+        logger.info(f"User {user_id} purchased {len(cards)} cards in session {session_id}")
+        
         return jsonify({
-            'success': False,
-            'error': 'Some cards already purchased',
-            'conflicts': conflicts
-        }), 409
-    
-    # Purchase cards - USING THE RENAMED FUNCTION
-    success, failed = insert_purchased_cards(user['id'], cards, session_id)
-    
-    # Update user balance
-    new_balance = update_balance(user_id, total_price, 'subtract')
-    
-    # Add to game participants
-    c.execute('''INSERT INTO game_participants 
-                 (session_id, user_id, cards, cards_bought, paid_amount) 
-                 VALUES (?, ?, ?, ?, ?)''',
-              (session_id, user['id'], json.dumps(cards), len(cards), total_price))
-    
-    # Update session stats
-    c.execute('''UPDATE game_sessions 
-                 SET total_cards_sold = total_cards_sold + ?,
-                     total_players = total_players + 1
-                 WHERE session_id = ?''',
-              (len(cards), session_id))
-    
-    conn.commit()
-    conn.close()
-    
-    logger.info(f"User {user_id} purchased {len(cards)} cards in session {session_id}")
-    
-    return jsonify({
-        'success': True,
-        'new_balance': new_balance,
-        'session_id': session_id,
-        'cards_purchased': len(cards),
-        'total_cards_sold': len(cards) + (session[1] if session else 0),
-        'total_players': 1
-    })
+            'success': True,
+            'new_balance': new_balance,
+            'session_id': session_id,
+            'cards_purchased': len(cards),
+            'total_cards_sold': len(cards) + (session[1] if session else 0),
+            'total_players': 1
+        })
+        
+    except Exception as e:
+        conn.rollback()
+        logger.error(f"Purchase error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        conn.close()
 
 @application.route('/health')
 def health():
