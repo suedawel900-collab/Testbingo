@@ -123,6 +123,29 @@ def init_db():
                   FOREIGN KEY (user_id) REFERENCES users(id),
                   FOREIGN KEY (session_id) REFERENCES game_sessions(session_id))''')
     
+    # Admin logs table
+    c.execute('''CREATE TABLE IF NOT EXISTS admin_logs
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  admin_id INTEGER,
+                  action TEXT,
+                  details TEXT,
+                  ip_address TEXT,
+                  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                  FOREIGN KEY (admin_id) REFERENCES users(id))''')
+    
+    # House fee history table
+    c.execute('''CREATE TABLE IF NOT EXISTS house_fee_history
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  session_id TEXT,
+                  total_cards INTEGER,
+                  card_price INTEGER,
+                  total_prize INTEGER,
+                  fee_percentage REAL,
+                  house_amount INTEGER,
+                  players_prize INTEGER,
+                  winner_count INTEGER,
+                  game_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+    
     conn.commit()
     conn.close()
     logger.info("Database initialized successfully")
@@ -164,14 +187,27 @@ def ensure_admin_user():
 ensure_admin_user()
 
 # ==================== DATABASE HELPER FUNCTIONS ====================
+def safe_int(value, default=None):
+    """Safely convert to int, return default if fails"""
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return default
+
 def get_user(telegram_id):
-    """Get user by telegram ID"""
-    if not telegram_id or telegram_id == 'guest':
+    """Get user by telegram ID - SAFE version that handles non-integers"""
+    # If it's 'guest' or None, return None
+    if telegram_id == 'guest' or telegram_id is None:
+        return None
+    
+    # Try to convert to int
+    user_id = safe_int(telegram_id)
+    if user_id is None:
         return None
     
     conn = sqlite3.connect('database/bingo.db')
     c = conn.cursor()
-    c.execute("SELECT * FROM users WHERE telegram_id = ?", (telegram_id,))
+    c.execute("SELECT * FROM users WHERE telegram_id = ?", (user_id,))
     user = c.fetchone()
     conn.close()
     
@@ -202,16 +238,21 @@ def create_user(telegram_id, username, first_name):
 
 def update_balance(telegram_id, amount, operation='add'):
     """Update user balance"""
+    user_id = safe_int(telegram_id)
+    if user_id is None:
+        return None
+        
     conn = sqlite3.connect('database/bingo.db')
     c = conn.cursor()
     
     if operation == 'add':
-        c.execute("UPDATE users SET balance = balance + ? WHERE telegram_id = ?", (amount, telegram_id))
+        c.execute("UPDATE users SET balance = balance + ? WHERE telegram_id = ?", (amount, user_id))
     else:
-        c.execute("UPDATE users SET balance = balance - ? WHERE telegram_id = ?", (amount, telegram_id))
+        c.execute("UPDATE users SET balance = balance - ? WHERE telegram_id = ?", (amount, user_id))
     
-    c.execute("SELECT balance FROM users WHERE telegram_id = ?", (telegram_id,))
-    new_balance = c.fetchone()[0]
+    c.execute("SELECT balance FROM users WHERE telegram_id = ?", (user_id,))
+    result = c.fetchone()
+    new_balance = result[0] if result else None
     conn.commit()
     conn.close()
     return new_balance
@@ -295,12 +336,9 @@ def game():
     balance = 1000
     
     if user_id != 'guest':
-        try:
-            user = get_user(int(user_id))
-            if user:
-                balance = user['balance']
-        except ValueError:
-            pass  # Invalid user_id, keep default balance
+        user = get_user(user_id)
+        if user:
+            balance = user['balance']
     
     return render_template('index.html', user_id=user_id, balance=balance)
 
@@ -316,18 +354,15 @@ def get_user_data(telegram_id):
             'is_admin': False
         })
     
-    try:
-        user = get_user(int(telegram_id))
-        if user:
-            return jsonify({
-                'success': True,
-                'balance': user['balance'],
-                'games': user['games_played'],
-                'wins': user['wins'],
-                'is_admin': user['is_admin']
-            })
-    except ValueError:
-        pass
+    user = get_user(telegram_id)
+    if user:
+        return jsonify({
+            'success': True,
+            'balance': user['balance'],
+            'games': user['games_played'],
+            'wins': user['wins'],
+            'is_admin': user['is_admin']
+        })
     
     return jsonify({'success': False, 'error': 'User not found'}), 404
 
@@ -339,12 +374,9 @@ def get_card_status():
     
     my_cards = []
     if user_id != 'guest':
-        try:
-            user = get_user(int(user_id))
-            if user:
-                my_cards = get_user_cards(user['id'])
-        except ValueError:
-            pass
+        user = get_user(user_id)
+        if user:
+            my_cards = get_user_cards(user['id'])
     
     return jsonify({
         'success': True,
@@ -407,12 +439,9 @@ def purchase_cards():
     cards = data.get('cards', [])
     total_price = data.get('total_price', 0)
     
-    try:
-        user = get_user(int(user_id))
-        if not user:
-            return jsonify({'success': False, 'error': 'User not found'}), 404
-    except ValueError:
-        return jsonify({'success': False, 'error': 'Invalid user ID'}), 400
+    user = get_user(user_id)
+    if not user:
+        return jsonify({'success': False, 'error': 'User not found'}), 404
     
     # Check balance
     if user['balance'] < total_price:
@@ -452,7 +481,7 @@ def purchase_cards():
     success, failed = purchase_cards(user['id'], cards, session_id)
     
     # Update user balance
-    new_balance = update_balance(int(user_id), total_price, 'subtract')
+    new_balance = update_balance(user_id, total_price, 'subtract')
     
     # Add to game participants
     c.execute('''INSERT INTO game_participants 
