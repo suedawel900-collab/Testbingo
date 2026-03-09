@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-MK BINGO - Telegram Bot Process with WAL mode
+MK BINGO - Telegram Bot Process
 """
 
 import os
@@ -67,25 +67,23 @@ logger.info("=" * 50)
 
 # ==================== DATABASE CONNECTION ====================
 def get_db_connection():
-    """Get database connection with WAL mode to prevent locking"""
+    """Get database connection with WAL mode"""
     try:
         conn = sqlite3.connect('database/bingo.db', timeout=30)
-        # Enable WAL mode for better concurrency
         conn.execute('PRAGMA journal_mode=WAL')
         conn.execute('PRAGMA synchronous=NORMAL')
-        conn.execute('PRAGMA busy_timeout=30000')  # 30 second timeout
+        conn.execute('PRAGMA busy_timeout=30000')
         return conn
     except Exception as e:
         logger.error(f"Database connection error: {e}")
         raise
 
 def db_transaction(func):
-    """Decorator to handle database transactions with commit/rollback"""
+    """Decorator to handle database transactions"""
     @wraps(func)
     def wrapper(*args, **kwargs):
         conn = get_db_connection()
         try:
-            # Pass conn as first argument, then the rest of the args
             result = func(conn, *args, **kwargs)
             conn.commit()
             return result
@@ -98,32 +96,15 @@ def db_transaction(func):
     return wrapper
 
 # ==================== DATABASE FUNCTIONS ====================
-@db_transaction
-def get_user(conn, telegram_id):
-    """Get user by telegram ID"""
-    c = conn.cursor()
-    c.execute("SELECT * FROM users WHERE telegram_id = ?", (telegram_id,))
-    user = c.fetchone()
-    
-    if user:
-        return {
-            'id': user[0],
-            'telegram_id': user[1],
-            'username': user[2],
-            'first_name': user[3],
-            'balance': user[4],
-            'games_played': user[5],
-            'wins': user[6],
-            'total_deposits': user[7],
-            'phone_number': user[8],
-            'is_admin': user[9],
-            'created_at': user[10]
-        }
-    return None
+def safe_int(value, default=None):
+    """Safely convert to int"""
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return default
 
-# Simple version without decorator for bot handlers
 def get_user_simple(telegram_id):
-    """Simple version without decorator for bot handlers"""
+    """Get user without decorator"""
     conn = get_db_connection()
     try:
         c = conn.cursor()
@@ -158,9 +139,23 @@ def create_user(conn, telegram_id, username, first_name):
     )
     logger.info(f"✅ Created user: {first_name} (ID: {telegram_id})")
 
+def create_user_simple(telegram_id, username, first_name):
+    """Create user without decorator"""
+    conn = get_db_connection()
+    try:
+        c = conn.cursor()
+        c.execute(
+            "INSERT OR IGNORE INTO users (telegram_id, username, first_name) VALUES (?, ?, ?)",
+            (telegram_id, username, first_name)
+        )
+        conn.commit()
+        logger.info(f"✅ Created user: {first_name} (ID: {telegram_id})")
+    finally:
+        conn.close()
+
 @db_transaction
 def update_user_phone(conn, telegram_id, phone_number):
-    """Update user's phone number"""
+    """Update user's phone number - CORRECT: takes conn, telegram_id, phone_number"""
     c = conn.cursor()
     c.execute(
         "UPDATE users SET phone_number = ? WHERE telegram_id = ?",
@@ -226,10 +221,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     db_user = get_user_simple(user.id)
     if not db_user:
-        create_user(None, user.id, user.username, user.first_name)
+        create_user_simple(user.id, user.username, user.first_name)
         db_user = get_user_simple(user.id)
     
-    # Check if phone number exists
     if db_user and not db_user['phone_number']:
         contact_keyboard = [
             [KeyboardButton("📱 Share Phone Number", request_contact=True)],
@@ -249,7 +243,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     is_admin = db_user and db_user['is_admin']
     
-    # Create main menu
     keyboard = [
         [InlineKeyboardButton("🎮 PLAY BINGO", web_app={"url": f"{APP_URL}/game?user={user.id}"})],
         [
@@ -278,7 +271,7 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     
     if contact and contact.user_id == user.id:
-        # Use None as first argument to create new connection
+        # CORRECT: Pass None as conn to create new connection
         update_user_phone(None, user.id, contact.phone_number)
         await update.message.reply_text("✅ Phone number saved!")
         
@@ -378,7 +371,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(f"❌ Deposit Rejected")
 
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle text messages (amount and transaction ID)"""
+    """Handle text messages"""
     user = update.effective_user
     text = update.message.text.strip()
     
@@ -454,9 +447,8 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ==================== MAIN BOT FUNCTION ====================
 def run_bot():
-    """Run the bot with lock file to prevent multiple instances"""
+    """Run the bot with lock file"""
     
-    # Try to acquire lock
     lock_fd = acquire_lock()
     if not lock_fd:
         logger.error("❌ Could not acquire lock. Exiting.")
@@ -467,10 +459,8 @@ def run_bot():
         logger.info("🤖 Starting Telegram Bot...")
         logger.info("=" * 50)
         
-        # Create application
         application = Application.builder().token(BOT_TOKEN).build()
         
-        # Add handlers
         application.add_handler(CommandHandler("start", start))
         application.add_handler(CallbackQueryHandler(button_handler))
         application.add_handler(MessageHandler(filters.CONTACT, handle_contact))
@@ -480,7 +470,6 @@ def run_bot():
         logger.info("✅ Bot handlers registered successfully")
         logger.info("🔄 Starting polling...")
         
-        # Start polling (this blocks)
         application.run_polling(
             drop_pending_updates=True,
             allowed_updates=['message', 'callback_query', 'contact']
@@ -497,40 +486,11 @@ def run_bot():
     finally:
         release_lock(lock_fd)
 
-# ==================== HEALTH CHECK ====================
-def check_environment():
-    """Check if all required environment variables are set"""
-    missing = []
-    
-    if not BOT_TOKEN:
-        missing.append("BOT_TOKEN")
-    if not ADMIN_ID:
-        missing.append("ADMIN_ID")
-    
-    if missing:
-        logger.error(f"Missing environment variables: {', '.join(missing)}")
-        return False
-    
-    # Check database connection
-    try:
-        conn = get_db_connection()
-        conn.close()
-        logger.info("✅ Database connection successful")
-    except Exception as e:
-        logger.error(f"❌ Database connection failed: {e}")
-        return False
-    
-    return True
-
 # ==================== MAIN ENTRY POINT ====================
 if __name__ == '__main__':
     logger.info("=" * 50)
     logger.info("MK BINGO Bot Process Starting")
     logger.info("=" * 50)
-    
-    if not check_environment():
-        logger.error("Environment check failed. Exiting.")
-        sys.exit(1)
     
     # Run bot with auto-restart
     while True:
