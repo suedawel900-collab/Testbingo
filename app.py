@@ -195,11 +195,9 @@ def safe_int(value, default=None):
 
 def get_user(telegram_id):
     """Get user by telegram ID - SAFE version that handles non-integers"""
-    # If it's 'guest' or None, return None
     if telegram_id == 'guest' or telegram_id is None:
         return None
     
-    # Try to convert to int
     user_id = safe_int(telegram_id)
     if user_id is None:
         return None
@@ -256,8 +254,9 @@ def update_balance(telegram_id, amount, operation='add'):
     conn.close()
     return new_balance
 
-def purchase_cards(user_id, card_numbers, session_id):
-    """Purchase multiple cards"""
+# ==================== FIXED: RENAMED DATABASE FUNCTION ====================
+def insert_purchased_cards(user_id, card_numbers, session_id):
+    """Insert purchased cards into database"""
     conn = sqlite3.connect('database/bingo.db')
     c = conn.cursor()
     
@@ -504,8 +503,8 @@ def purchase_cards():
             'conflicts': conflicts
         }), 409
     
-    # Purchase cards
-    success, failed = purchase_cards(user['id'], cards, session_id)
+    # Purchase cards - USING THE RENAMED FUNCTION
+    success, failed = insert_purchased_cards(user['id'], cards, session_id)
     
     # Update user balance
     new_balance = update_balance(user_id, total_price, 'subtract')
