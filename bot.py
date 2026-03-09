@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-MK BINGO - Telegram Bot Process with Lock File
+MK BINGO - Telegram Bot Process with WAL mode
 """
 
 import os
@@ -12,6 +12,7 @@ import sqlite3
 import json
 from datetime import datetime
 from typing import Optional, Dict, Any
+from functools import wraps
 
 # Setup logging
 logging.basicConfig(
@@ -64,18 +65,47 @@ logger.info(f"🌐 App URL: {APP_URL}")
 logger.info(f"👑 Admin ID: {ADMIN_ID}")
 logger.info("=" * 50)
 
-# ==================== DATABASE FUNCTIONS ====================
+# ==================== DATABASE CONNECTION ====================
 def get_db_connection():
-    """Get database connection"""
-    return sqlite3.connect('database/bingo.db', check_same_thread=False)
+    """Get database connection with WAL mode to prevent locking"""
+    try:
+        conn = sqlite3.connect('database/bingo.db', timeout=30)
+        # Enable WAL mode for better concurrency
+        conn.execute('PRAGMA journal_mode=WAL')
+        conn.execute('PRAGMA synchronous=NORMAL')
+        conn.execute('PRAGMA busy_timeout=30000')  # 30 second timeout
+        return conn
+    except Exception as e:
+        logger.error(f"Database connection error: {e}")
+        raise
 
-def get_user(telegram_id: int) -> Optional[Dict[str, Any]]:
+def db_transaction(func):
+    """Decorator to handle database transactions with commit/rollback"""
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        conn = None
+        try:
+            conn = get_db_connection()
+            result = func(conn, *args, **kwargs)
+            conn.commit()
+            return result
+        except Exception as e:
+            if conn:
+                conn.rollback()
+            logger.error(f"Database error in {func.__name__}: {e}")
+            raise
+        finally:
+            if conn:
+                conn.close()
+    return wrapper
+
+# ==================== DATABASE FUNCTIONS ====================
+@db_transaction
+def get_user(conn, telegram_id: int) -> Optional[Dict[str, Any]]:
     """Get user by telegram ID"""
-    conn = get_db_connection()
     c = conn.cursor()
     c.execute("SELECT * FROM users WHERE telegram_id = ?", (telegram_id,))
     user = c.fetchone()
-    conn.close()
     
     if user:
         return {
@@ -93,46 +123,40 @@ def get_user(telegram_id: int) -> Optional[Dict[str, Any]]:
         }
     return None
 
-def create_user(telegram_id: int, username: str, first_name: str) -> None:
+@db_transaction
+def create_user(conn, telegram_id: int, username: str, first_name: str) -> None:
     """Create new user"""
-    conn = get_db_connection()
     c = conn.cursor()
     c.execute(
         "INSERT OR IGNORE INTO users (telegram_id, username, first_name) VALUES (?, ?, ?)",
         (telegram_id, username, first_name)
     )
-    conn.commit()
-    conn.close()
     logger.info(f"✅ Created user: {first_name} (ID: {telegram_id})")
 
-def update_user_phone(telegram_id: int, phone_number: str) -> None:
+@db_transaction
+def update_user_phone(conn, telegram_id: int, phone_number: str) -> None:
     """Update user's phone number"""
-    conn = get_db_connection()
     c = conn.cursor()
     c.execute(
         "UPDATE users SET phone_number = ? WHERE telegram_id = ?",
         (phone_number, telegram_id)
     )
-    conn.commit()
-    conn.close()
     logger.info(f"📱 Updated phone for user {telegram_id}")
 
-def add_transaction(user_id: int, amount: int, tx_id: str) -> None:
+@db_transaction
+def add_transaction(conn, user_id: int, amount: int, tx_id: str) -> None:
     """Add new deposit transaction"""
-    conn = get_db_connection()
     c = conn.cursor()
     receipt_url = f"https://transactioninfo.ethiotelecom.et/receipt/{tx_id}"
     c.execute(
         "INSERT INTO transactions (user_id, amount, tx_id, receipt_url) VALUES (?, ?, ?, ?)",
         (user_id, amount, tx_id, receipt_url)
     )
-    conn.commit()
-    conn.close()
     logger.info(f"💰 Added transaction: {tx_id} for {amount} ETB")
 
-def approve_transaction(tx_id: str, admin_id: int) -> tuple:
+@db_transaction
+def approve_transaction(conn, tx_id: str, admin_id: int) -> tuple:
     """Approve transaction and update user balance"""
-    conn = get_db_connection()
     c = conn.cursor()
     
     c.execute(
@@ -143,7 +167,6 @@ def approve_transaction(tx_id: str, admin_id: int) -> tuple:
     c.execute("SELECT user_id, amount FROM transactions WHERE tx_id = ?", (tx_id,))
     result = c.fetchone()
     if not result:
-        conn.close()
         return None, None
     
     user_id, amount = result
@@ -156,18 +179,15 @@ def approve_transaction(tx_id: str, admin_id: int) -> tuple:
     c.execute("SELECT telegram_id FROM users WHERE id = ?", (user_id,))
     telegram_id = c.fetchone()[0]
     
-    conn.commit()
-    conn.close()
     logger.info(f"✅ Approved transaction {tx_id} for {amount} ETB")
     return telegram_id, amount
 
-def get_pending_transactions_count() -> int:
+@db_transaction
+def get_pending_transactions_count(conn) -> int:
     """Get count of pending transactions"""
-    conn = get_db_connection()
     c = conn.cursor()
     c.execute("SELECT COUNT(*) FROM transactions WHERE status = 'pending'")
     count = c.fetchone()[0]
-    conn.close()
     return count
 
 # ==================== TELEGRAM BOT HANDLERS ====================
@@ -180,10 +200,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     logger.info(f"📨 Start command from {user.first_name} (ID: {user.id})")
     
-    db_user = get_user(user.id)
+    db_user = get_user(None, user.id)
     if not db_user:
-        create_user(user.id, user.username, user.first_name)
-        db_user = get_user(user.id)
+        create_user(None, user.id, user.username, user.first_name)
+        db_user = get_user(None, user.id)
     
     # Check if phone number exists
     if db_user and not db_user['phone_number']:
@@ -219,7 +239,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard.append([InlineKeyboardButton("👑 ADMIN PANEL", web_app={"url": f"{APP_URL}/admin?user={user.id}"})])
     
     balance = db_user['balance'] if db_user else 1000
-    pending = get_pending_transactions_count()
+    pending = get_pending_transactions_count(None)
     
     await update.message.reply_text(
         f"🎰 Welcome to MK BINGO, {user.first_name}!\n"
@@ -234,10 +254,10 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     
     if contact and contact.user_id == user.id:
-        update_user_phone(user.id, contact.phone_number)
+        update_user_phone(None, user.id, contact.phone_number)
         await update.message.reply_text("✅ Phone number saved!")
         
-        db_user = get_user(user.id)
+        db_user = get_user(None, user.id)
         is_admin = db_user and db_user['is_admin']
         
         keyboard = [
@@ -266,7 +286,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     data = query.data
     user = query.from_user
-    db_user = get_user(user.id)
+    db_user = get_user(None, user.id)
     
     if data == "balance":
         if db_user:
@@ -305,7 +325,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         
         tx_id = data.replace("approve_", "")
-        telegram_id, amount = approve_transaction(tx_id, ADMIN_ID)
+        telegram_id, amount = approve_transaction(None, tx_id, ADMIN_ID)
         
         if telegram_id:
             await context.bot.send_message(
@@ -367,12 +387,12 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data.clear()
             return
         
-        db_user = get_user(user.id)
+        db_user = get_user(None, user.id)
         if not db_user:
             await update.message.reply_text("❌ User not found. Please use /start")
             return
         
-        add_transaction(db_user['id'], amount, tx_id)
+        add_transaction(None, db_user['id'], amount, tx_id)
         
         keyboard = [[
             InlineKeyboardButton("✅ Approve", callback_data=f"approve_{tx_id}"),
@@ -443,19 +463,59 @@ def run_bot():
         
         logger.info("⏹️ Bot polling stopped")
         
+    except Conflict as e:
+        logger.error(f"⚠️ Conflict error: {e}")
+        time.sleep(10)
     except Exception as e:
         logger.error(f"❌ Bot error: {e}")
         logger.exception("Full traceback:")
     finally:
         release_lock(lock_fd)
 
+# ==================== HEALTH CHECK ====================
+def check_environment():
+    """Check if all required environment variables are set"""
+    missing = []
+    
+    if not BOT_TOKEN:
+        missing.append("BOT_TOKEN")
+    if not ADMIN_ID:
+        missing.append("ADMIN_ID")
+    
+    if missing:
+        logger.error(f"Missing environment variables: {', '.join(missing)}")
+        return False
+    
+    # Check database connection
+    try:
+        conn = get_db_connection()
+        conn.close()
+        logger.info("✅ Database connection successful")
+    except Exception as e:
+        logger.error(f"❌ Database connection failed: {e}")
+        return False
+    
+    return True
+
 # ==================== MAIN ENTRY POINT ====================
 if __name__ == '__main__':
-    try:
-        run_bot()
-    except KeyboardInterrupt:
-        logger.info("⏹️ Bot stopped by user")
-        sys.exit(0)
-    except Exception as e:
-        logger.error(f"❌ Fatal error: {e}")
+    logger.info("=" * 50)
+    logger.info("MK BINGO Bot Process Starting")
+    logger.info("=" * 50)
+    
+    if not check_environment():
+        logger.error("Environment check failed. Exiting.")
         sys.exit(1)
+    
+    # Run bot with auto-restart
+    while True:
+        try:
+            run_bot()
+        except KeyboardInterrupt:
+            logger.info("⏹️ Bot stopped by user")
+            sys.exit(0)
+        except Exception as e:
+            logger.error(f"❌ Bot crashed: {e}")
+            logger.exception("Full traceback:")
+            logger.info("Restarting in 10 seconds...")
+            time.sleep(10)
