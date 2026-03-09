@@ -35,7 +35,6 @@ def get_db():
     """Get database connection with proper settings"""
     conn = sqlite3.connect('database/bingo.db', timeout=30)
     conn.row_factory = sqlite3.Row
-    # Enable WAL mode for better concurrency
     conn.execute('PRAGMA journal_mode=WAL')
     conn.execute('PRAGMA synchronous=NORMAL')
     conn.execute('PRAGMA busy_timeout=30000')
@@ -66,7 +65,6 @@ def init_db():
     conn = get_db()
     c = conn.cursor()
     
-    # Users table
     c.execute('''CREATE TABLE IF NOT EXISTS users
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   telegram_id INTEGER UNIQUE,
@@ -80,7 +78,6 @@ def init_db():
                   is_admin BOOLEAN DEFAULT 0,
                   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     
-    # Purchased cards table
     c.execute('''CREATE TABLE IF NOT EXISTS purchased_cards
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   card_number INTEGER UNIQUE,
@@ -90,7 +87,6 @@ def init_db():
                   status TEXT DEFAULT 'active',
                   FOREIGN KEY (user_id) REFERENCES users(id))''')
     
-    # Transactions table
     c.execute('''CREATE TABLE IF NOT EXISTS transactions
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   user_id INTEGER,
@@ -103,7 +99,6 @@ def init_db():
                   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                   FOREIGN KEY (user_id) REFERENCES users(id))''')
     
-    # Game settings table
     c.execute('''CREATE TABLE IF NOT EXISTS game_settings
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   game_type TEXT DEFAULT 'full house',
@@ -114,7 +109,6 @@ def init_db():
                   updated_by INTEGER,
                   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     
-    # Insert default settings if not exists
     c.execute("SELECT COUNT(*) FROM game_settings")
     if c.fetchone()[0] == 0:
         c.execute('''INSERT INTO game_settings 
@@ -122,7 +116,6 @@ def init_db():
                      VALUES (?, ?, ?, ?, ?)''',
                   ('full house', 10, 10, 3, 5))
     
-    # Game sessions table
     c.execute('''CREATE TABLE IF NOT EXISTS game_sessions
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   session_id TEXT UNIQUE,
@@ -137,7 +130,6 @@ def init_db():
                   house_fee REAL DEFAULT 5,
                   house_collected INTEGER DEFAULT 0)''')
     
-    # Game participants table
     c.execute('''CREATE TABLE IF NOT EXISTS game_participants
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   session_id TEXT,
@@ -157,7 +149,7 @@ def init_db():
 
 init_db()
 
-# ==================== FIX: ENSURE ADMIN USER IS SET ====================
+# ==================== ENSURE ADMIN USER ====================
 def ensure_admin_user():
     """Make sure the ADMIN_ID user is set as admin in database"""
     if not ADMIN_ID or ADMIN_ID == 0:
@@ -167,19 +159,14 @@ def ensure_admin_user():
     conn = get_db()
     c = conn.cursor()
     
-    # Check if user exists
     c.execute("SELECT id, is_admin FROM users WHERE telegram_id = ?", (ADMIN_ID,))
     user = c.fetchone()
     
     if user:
-        # User exists, make sure they are admin
         if user[1] != 1:
             c.execute("UPDATE users SET is_admin = 1 WHERE telegram_id = ?", (ADMIN_ID,))
             logger.info(f"User {ADMIN_ID} updated to admin")
-        else:
-            logger.info(f"User {ADMIN_ID} is already admin")
     else:
-        # User doesn't exist, create them as admin
         c.execute('''INSERT INTO users 
                      (telegram_id, username, first_name, is_admin) 
                      VALUES (?, ?, ?, 1)''',
@@ -191,7 +178,7 @@ def ensure_admin_user():
 
 ensure_admin_user()
 
-# ==================== DATABASE HELPER FUNCTIONS ====================
+# ==================== SAFE INT CONVERSION ====================
 def safe_int(value, default=None):
     """Safely convert to int, return default if fails"""
     try:
@@ -199,9 +186,10 @@ def safe_int(value, default=None):
     except (ValueError, TypeError):
         return default
 
+# ==================== DATABASE FUNCTIONS ====================
 @db_transaction
 def get_user(conn, telegram_id):
-    """Get user by telegram ID - decorated version"""
+    """Get user by telegram ID"""
     if telegram_id == 'guest' or telegram_id is None:
         return None
     
@@ -229,7 +217,6 @@ def get_user(conn, telegram_id):
         }
     return None
 
-# Non-decorated version for simple calls
 def get_user_simple(telegram_id):
     """Simple version without decorator"""
     conn = get_db()
@@ -263,8 +250,8 @@ def get_user_simple(telegram_id):
     finally:
         conn.close()
 
-def create_user(telegram_id, username, first_name):
-    """Create new user"""
+def create_user_simple(telegram_id, username, first_name):
+    """Create user without decorator"""
     conn = get_db()
     try:
         c = conn.cursor()
@@ -312,7 +299,7 @@ def insert_purchased_cards(conn, user_id, card_numbers, session_id):
 
 @db_transaction
 def get_purchased_cards(conn, session_id=None):
-    """Get all purchased cards"""
+    """Get all purchased cards - CORRECT: takes conn and optional session_id"""
     c = conn.cursor()
     
     if session_id:
@@ -325,7 +312,7 @@ def get_purchased_cards(conn, session_id=None):
 
 @db_transaction
 def get_user_cards(conn, user_id):
-    """Get cards purchased by a specific user"""
+    """Get cards purchased by a specific user - CORRECT: takes conn and user_id"""
     c = conn.cursor()
     c.execute("SELECT card_number FROM purchased_cards WHERE user_id = ? AND status = 'active'", (user_id,))
     cards = [row[0] for row in c.fetchall()]
@@ -430,7 +417,8 @@ def get_card_status():
     if user_id != 'guest':
         user = get_user_simple(user_id)
         if user:
-            my_cards = get_user_cards(None, user['id'])  # Will use decorator
+            # Use decorator function - pass None as conn to create new connection
+            my_cards = get_user_cards(None, user['id'])
     
     return jsonify({
         'success': True,
@@ -478,28 +466,21 @@ def get_game_session():
     finally:
         conn.close()
 
-# ==================== FIXED PURCHASE ENDPOINT ====================
 @application.route('/api/game/purchase', methods=['POST'])
 def purchase_cards():
     """Purchase cards and join game - handles 'guest' user"""
     data = request.json
     user_id = data.get('user_id', 'guest')
     
-    # Guest users cannot purchase
     if user_id == 'guest':
-        return jsonify({
-            'success': False,
-            'error': 'Please use Telegram to play'
-        }), 400
+        return jsonify({'success': False, 'error': 'Please use Telegram to play'}), 400
     
     cards = data.get('cards', [])
     total_price = data.get('total_price', 0)
     
-    # Validate cards
     if not cards:
         return jsonify({'success': False, 'error': 'No cards selected'}), 400
     
-    # Validate card numbers
     for card in cards:
         if not isinstance(card, int) or card < 1 or card > 1000:
             return jsonify({'success': False, 'error': f'Invalid card number: {card}'}), 400
@@ -508,11 +489,9 @@ def purchase_cards():
     if not user:
         return jsonify({'success': False, 'error': 'User not found'}), 404
     
-    # Check balance
     if user['balance'] < total_price:
         return jsonify({'success': False, 'error': 'Insufficient balance'}), 400
     
-    # Get or create session - use a single connection for the whole transaction
     conn = get_db()
     try:
         c = conn.cursor()
@@ -531,7 +510,7 @@ def purchase_cards():
         else:
             session_id = session[0]
         
-        # Check if cards are available in this session
+        # Check if cards are available - pass conn to use existing connection
         purchased = get_purchased_cards(conn, session_id)
         conflicts = [c for c in cards if c in purchased]
         
@@ -542,19 +521,17 @@ def purchase_cards():
                 'conflicts': conflicts
             }), 409
         
-        # Purchase cards
+        # Purchase cards - pass conn to use existing connection
         success, failed = insert_purchased_cards(conn, user['id'], cards, session_id)
         
-        # Update user balance
+        # Update user balance - pass conn to use existing connection
         new_balance = update_balance(conn, user_id, total_price, 'subtract')
         
-        # Add to game participants
         c.execute('''INSERT INTO game_participants 
                      (session_id, user_id, cards, cards_bought, paid_amount) 
                      VALUES (?, ?, ?, ?, ?)''',
                   (session_id, user['id'], json.dumps(cards), len(cards), total_price))
         
-        # Update session stats
         c.execute('''UPDATE game_sessions 
                      SET total_cards_sold = total_cards_sold + ?,
                          total_players = total_players + 1
