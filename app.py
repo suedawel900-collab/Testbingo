@@ -1,7 +1,6 @@
 import os
 import sqlite3
 import threading
-import asyncio
 import logging
 import time
 import json
@@ -36,7 +35,7 @@ def init_db():
     """Initialize database tables"""
     os.makedirs('database', exist_ok=True)
     
-    conn = sqlite3.connect('database/bingo.db', check_same_thread=False)
+    conn = sqlite3.connect('database/bingo.db')
     c = conn.cursor()
     
     # Users table
@@ -167,6 +166,9 @@ ensure_admin_user()
 # ==================== DATABASE HELPER FUNCTIONS ====================
 def get_user(telegram_id):
     """Get user by telegram ID"""
+    if not telegram_id or telegram_id == 'guest':
+        return None
+    
     conn = sqlite3.connect('database/bingo.db')
     c = conn.cursor()
     c.execute("SELECT * FROM users WHERE telegram_id = ?", (telegram_id,))
@@ -257,6 +259,30 @@ def get_user_cards(user_id):
     conn.close()
     return cards
 
+def get_game_settings():
+    """Get current game settings"""
+    conn = sqlite3.connect('database/bingo.db')
+    c = conn.cursor()
+    c.execute("SELECT game_type, card_price, min_cards_to_start, call_interval, house_fee FROM game_settings ORDER BY updated_at DESC LIMIT 1")
+    settings = c.fetchone()
+    conn.close()
+    
+    if settings:
+        return {
+            'game_type': settings[0],
+            'card_price': settings[1],
+            'min_cards_to_start': settings[2],
+            'call_interval': settings[3],
+            'house_fee': settings[4]
+        }
+    return {
+        'game_type': 'full house',
+        'card_price': 10,
+        'min_cards_to_start': 10,
+        'call_interval': 3,
+        'house_fee': 5
+    }
+
 # ==================== FLASK ROUTES ====================
 
 @application.route('/')
@@ -269,36 +295,56 @@ def game():
     balance = 1000
     
     if user_id != 'guest':
-        user = get_user(int(user_id))
-        if user:
-            balance = user['balance']
+        try:
+            user = get_user(int(user_id))
+            if user:
+                balance = user['balance']
+        except ValueError:
+            pass  # Invalid user_id, keep default balance
     
     return render_template('index.html', user_id=user_id, balance=balance)
 
-@application.route('/api/user/<int:telegram_id>')
+@application.route('/api/user/<telegram_id>')
 def get_user_data(telegram_id):
-    user = get_user(telegram_id)
-    if user:
+    """Get user data - handles both numeric and 'guest'"""
+    if telegram_id == 'guest':
         return jsonify({
             'success': True,
-            'balance': user['balance'],
-            'games': user['games_played'],
-            'wins': user['wins'],
-            'is_admin': user['is_admin']
+            'balance': 1000,
+            'games': 0,
+            'wins': 0,
+            'is_admin': False
         })
-    return jsonify({'success': False, 'error': 'Not found'}), 404
+    
+    try:
+        user = get_user(int(telegram_id))
+        if user:
+            return jsonify({
+                'success': True,
+                'balance': user['balance'],
+                'games': user['games_played'],
+                'wins': user['wins'],
+                'is_admin': user['is_admin']
+            })
+    except ValueError:
+        pass
+    
+    return jsonify({'success': False, 'error': 'User not found'}), 404
 
 @application.route('/api/cards/status')
 def get_card_status():
-    """Get status of all cards"""
-    user_id = request.args.get('user_id')
+    """Get status of all cards - handles 'guest' user"""
+    user_id = request.args.get('user_id', 'guest')
     cards = get_purchased_cards()
     
     my_cards = []
-    if user_id:
-        user = get_user(int(user_id))
-        if user:
-            my_cards = get_user_cards(user['id'])
+    if user_id != 'guest':
+        try:
+            user = get_user(int(user_id))
+            if user:
+                my_cards = get_user_cards(user['id'])
+        except ValueError:
+            pass
     
     return jsonify({
         'success': True,
@@ -347,15 +393,26 @@ def get_game_session():
 
 @application.route('/api/game/purchase', methods=['POST'])
 def purchase_cards():
-    """Purchase cards and join game"""
+    """Purchase cards and join game - handles 'guest' user"""
     data = request.json
-    user_id = data.get('user_id')
+    user_id = data.get('user_id', 'guest')
+    
+    # Guest users cannot purchase
+    if user_id == 'guest':
+        return jsonify({
+            'success': False,
+            'error': 'Please use Telegram to play'
+        }), 400
+    
     cards = data.get('cards', [])
     total_price = data.get('total_price', 0)
     
-    user = get_user(int(user_id))
-    if not user:
-        return jsonify({'success': False, 'error': 'User not found'}), 404
+    try:
+        user = get_user(int(user_id))
+        if not user:
+            return jsonify({'success': False, 'error': 'User not found'}), 404
+    except ValueError:
+        return jsonify({'success': False, 'error': 'Invalid user ID'}), 400
     
     # Check balance
     if user['balance'] < total_price:
@@ -368,7 +425,7 @@ def purchase_cards():
     c.execute("SELECT session_id FROM game_sessions WHERE status = 'waiting' ORDER BY id DESC LIMIT 1")
     session = c.fetchone()
     
-    settings = {'card_price': 10, 'min_cards_to_start': 10, 'game_type': 'full house', 'house_fee': 5}
+    settings = get_game_settings()
     
     if not session:
         session_id = str(uuid.uuid4())[:8]
@@ -395,7 +452,7 @@ def purchase_cards():
     success, failed = purchase_cards(user['id'], cards, session_id)
     
     # Update user balance
-    new_balance = update_balance(user_id, total_price, 'subtract')
+    new_balance = update_balance(int(user_id), total_price, 'subtract')
     
     # Add to game participants
     c.execute('''INSERT INTO game_participants 
@@ -423,7 +480,7 @@ def purchase_cards():
         'session_id': session_id,
         'total_cards_sold': updated[0],
         'total_players': updated[1],
-        'game_ready': updated[0] >= 10
+        'game_ready': updated[0] >= settings['min_cards_to_start']
     })
 
 @application.route('/health')
@@ -434,62 +491,6 @@ def health():
         'url': APP_URL
     })
 
-# ==================== BOT SETUP - RUN IN MAIN THREAD ====================
-def run_bot():
-    """Run Telegram bot in the main thread"""
-    from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-    from telegram.ext import Application, CommandHandler, ContextTypes
-    
-    if not BOT_TOKEN:
-        logger.error("No BOT_TOKEN")
-        return
-    
-    logger.info(f"Starting bot in main thread...")
-    
-    async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle /start command"""
-        user = update.effective_user
-        logger.info(f"Start command from {user.first_name} (ID: {user.id})")
-        
-        # Check if user exists
-        db_user = get_user(user.id)
-        if not db_user:
-            create_user(user.id, user.username, user.first_name)
-            db_user = get_user(user.id)
-        
-        # Check if admin
-        is_admin = db_user and db_user['is_admin']
-        
-        # Create menu
-        keyboard = [
-            [InlineKeyboardButton("🎮 PLAY BINGO", web_app={"url": f"{APP_URL}/game?user={user.id}"})]
-        ]
-        
-        if is_admin:
-            keyboard.append([InlineKeyboardButton("👑 ADMIN PANEL", web_app={"url": f"{APP_URL}/admin?user={user.id}"})])
-        
-        balance = db_user['balance'] if db_user else 1000
-        
-        await update.message.reply_text(
-            f"🎰 Welcome to MK BINGO, {user.first_name}!\n💰 Balance: {balance} ETB",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
-    
-    # Create application
-    application = Application.builder().token(BOT_TOKEN).build()
-    application.add_handler(CommandHandler("start", start))
-    
-    logger.info("Bot started polling...")
-    application.run_polling(drop_pending_updates=True)
-
-# ==================== MAIN ====================
 if __name__ == '__main__':
-    # Check if we should run bot or flask
-    import sys
-    if len(sys.argv) > 1 and sys.argv[1] == 'bot':
-        # Run just the bot
-        run_bot()
-    else:
-        # Run Flask (bot will be run in a separate process)
-        port = int(os.environ.get('PORT', 5000))
-        application.run(host='0.0.0.0', port=port)
+    port = int(os.environ.get('PORT', 5000))
+    application.run(host='0.0.0.0', port=port)
