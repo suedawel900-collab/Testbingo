@@ -83,25 +83,23 @@ def db_transaction(func):
     """Decorator to handle database transactions with commit/rollback"""
     @wraps(func)
     def wrapper(*args, **kwargs):
-        conn = None
+        conn = get_db_connection()
         try:
-            conn = get_db_connection()
+            # Pass conn as first argument
             result = func(conn, *args, **kwargs)
             conn.commit()
             return result
         except Exception as e:
-            if conn:
-                conn.rollback()
+            conn.rollback()
             logger.error(f"Database error in {func.__name__}: {e}")
             raise
         finally:
-            if conn:
-                conn.close()
+            conn.close()
     return wrapper
 
 # ==================== DATABASE FUNCTIONS ====================
 @db_transaction
-def get_user(conn, telegram_id: int) -> Optional[Dict[str, Any]]:
+def get_user(conn, telegram_id):
     """Get user by telegram ID"""
     c = conn.cursor()
     c.execute("SELECT * FROM users WHERE telegram_id = ?", (telegram_id,))
@@ -123,8 +121,35 @@ def get_user(conn, telegram_id: int) -> Optional[Dict[str, Any]]:
         }
     return None
 
+# Simple version without decorator for bot handlers
+def get_user_simple(telegram_id):
+    """Simple version without decorator for bot handlers"""
+    conn = get_db_connection()
+    try:
+        c = conn.cursor()
+        c.execute("SELECT * FROM users WHERE telegram_id = ?", (telegram_id,))
+        user = c.fetchone()
+        
+        if user:
+            return {
+                'id': user[0],
+                'telegram_id': user[1],
+                'username': user[2],
+                'first_name': user[3],
+                'balance': user[4],
+                'games_played': user[5],
+                'wins': user[6],
+                'total_deposits': user[7],
+                'phone_number': user[8],
+                'is_admin': user[9],
+                'created_at': user[10]
+            }
+        return None
+    finally:
+        conn.close()
+
 @db_transaction
-def create_user(conn, telegram_id: int, username: str, first_name: str) -> None:
+def create_user(conn, telegram_id, username, first_name):
     """Create new user"""
     c = conn.cursor()
     c.execute(
@@ -134,7 +159,7 @@ def create_user(conn, telegram_id: int, username: str, first_name: str) -> None:
     logger.info(f"✅ Created user: {first_name} (ID: {telegram_id})")
 
 @db_transaction
-def update_user_phone(conn, telegram_id: int, phone_number: str) -> None:
+def update_user_phone(conn, telegram_id, phone_number):
     """Update user's phone number"""
     c = conn.cursor()
     c.execute(
@@ -144,7 +169,7 @@ def update_user_phone(conn, telegram_id: int, phone_number: str) -> None:
     logger.info(f"📱 Updated phone for user {telegram_id}")
 
 @db_transaction
-def add_transaction(conn, user_id: int, amount: int, tx_id: str) -> None:
+def add_transaction(conn, user_id, amount, tx_id):
     """Add new deposit transaction"""
     c = conn.cursor()
     receipt_url = f"https://transactioninfo.ethiotelecom.et/receipt/{tx_id}"
@@ -155,7 +180,7 @@ def add_transaction(conn, user_id: int, amount: int, tx_id: str) -> None:
     logger.info(f"💰 Added transaction: {tx_id} for {amount} ETB")
 
 @db_transaction
-def approve_transaction(conn, tx_id: str, admin_id: int) -> tuple:
+def approve_transaction(conn, tx_id, admin_id):
     """Approve transaction and update user balance"""
     c = conn.cursor()
     
@@ -183,12 +208,11 @@ def approve_transaction(conn, tx_id: str, admin_id: int) -> tuple:
     return telegram_id, amount
 
 @db_transaction
-def get_pending_transactions_count(conn) -> int:
+def get_pending_transactions_count(conn):
     """Get count of pending transactions"""
     c = conn.cursor()
     c.execute("SELECT COUNT(*) FROM transactions WHERE status = 'pending'")
-    count = c.fetchone()[0]
-    return count
+    return c.fetchone()[0]
 
 # ==================== TELEGRAM BOT HANDLERS ====================
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
@@ -200,10 +224,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     logger.info(f"📨 Start command from {user.first_name} (ID: {user.id})")
     
-    db_user = get_user(None, user.id)
+    db_user = get_user_simple(user.id)
     if not db_user:
         create_user(None, user.id, user.username, user.first_name)
-        db_user = get_user(None, user.id)
+        db_user = get_user_simple(user.id)
     
     # Check if phone number exists
     if db_user and not db_user['phone_number']:
@@ -257,7 +281,7 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
         update_user_phone(None, user.id, contact.phone_number)
         await update.message.reply_text("✅ Phone number saved!")
         
-        db_user = get_user(None, user.id)
+        db_user = get_user_simple(user.id)
         is_admin = db_user and db_user['is_admin']
         
         keyboard = [
@@ -286,7 +310,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     data = query.data
     user = query.from_user
-    db_user = get_user(None, user.id)
+    db_user = get_user_simple(user.id)
     
     if data == "balance":
         if db_user:
@@ -387,7 +411,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data.clear()
             return
         
-        db_user = get_user(None, user.id)
+        db_user = get_user_simple(user.id)
         if not db_user:
             await update.message.reply_text("❌ User not found. Please use /start")
             return
