@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-MK BINGO - Telegram Bot Process
+MK BINGO - Telegram Bot Process with Lock File
 """
 
 import os
 import sys
 import time
+import fcntl
 import logging
 import sqlite3
 import json
@@ -19,6 +20,33 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# ==================== LOCK FILE ====================
+LOCK_FILE = '/tmp/bot.lock'
+
+def acquire_lock():
+    """Acquire lock file to ensure only one bot instance runs"""
+    try:
+        lock_fd = open(LOCK_FILE, 'w')
+        fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        lock_fd.write(str(os.getpid()))
+        lock_fd.flush()
+        logger.info(f"✅ Lock acquired by process {os.getpid()}")
+        return lock_fd
+    except (IOError, OSError):
+        logger.error("❌ Another bot instance is already running (lock file exists)")
+        return None
+
+def release_lock(lock_fd):
+    """Release the lock file"""
+    if lock_fd:
+        fcntl.flock(lock_fd, fcntl.LOCK_UN)
+        lock_fd.close()
+        try:
+            os.unlink(LOCK_FILE)
+        except:
+            pass
+        logger.info("🔓 Lock released")
+
 # ==================== CONFIGURATION ====================
 BOT_TOKEN = os.environ.get('BOT_TOKEN')
 ADMIN_ID = int(os.environ.get('ADMIN_ID', '0'))
@@ -30,7 +58,7 @@ if not BOT_TOKEN:
     sys.exit(1)
 
 logger.info("=" * 50)
-logger.info(f"🚀 Starting MK BINGO Bot Process")
+logger.info(f"🚀 Starting MK BINGO Bot Process (PID: {os.getpid()})")
 logger.info(f"🤖 Bot Token: {BOT_TOKEN[:5]}...")
 logger.info(f"🌐 App URL: {APP_URL}")
 logger.info(f"👑 Admin ID: {ADMIN_ID}")
@@ -381,59 +409,45 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ==================== MAIN BOT FUNCTION ====================
 def run_bot():
-    """Run the bot with proper error handling"""
-    logger.info("=" * 50)
-    logger.info("🤖 Starting Telegram Bot...")
-    logger.info("=" * 50)
+    """Run the bot with lock file to prevent multiple instances"""
     
-    retry_count = 0
-    max_retries = 10
-    
-    while retry_count < max_retries:
-        try:
-            # Create application
-            application = Application.builder().token(BOT_TOKEN).build()
-            
-            # Add handlers
-            application.add_handler(CommandHandler("start", start))
-            application.add_handler(CallbackQueryHandler(button_handler))
-            application.add_handler(MessageHandler(filters.CONTACT, handle_contact))
-            application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
-            application.add_error_handler(error_handler)
-            
-            logger.info("✅ Bot handlers registered successfully")
-            logger.info("🔄 Starting polling...")
-            
-            # Start polling (this blocks)
-            application.run_polling(
-                drop_pending_updates=True,
-                allowed_updates=['message', 'callback_query', 'contact']
-            )
-            
-            # If we get here, polling stopped
-            logger.info("⏹️ Bot polling stopped")
-            break
-            
-        except Conflict as e:
-            logger.error(f"⚠️ Conflict error: {e}")
-            retry_count += 1
-            if retry_count < max_retries:
-                wait = 10
-                logger.info(f"⏱️ Waiting {wait} seconds before retry...")
-                time.sleep(wait)
-            
-        except Exception as e:
-            logger.error(f"❌ Unexpected error: {e}")
-            logger.exception("Full traceback:")
-            retry_count += 1
-            if retry_count < max_retries:
-                wait = 15
-                logger.info(f"⏱️ Waiting {wait} seconds before retry...")
-                time.sleep(wait)
-    
-    if retry_count >= max_retries:
-        logger.error("❌ Max retries reached. Bot failed to start.")
+    # Try to acquire lock
+    lock_fd = acquire_lock()
+    if not lock_fd:
+        logger.error("❌ Could not acquire lock. Exiting.")
         sys.exit(1)
+    
+    try:
+        logger.info("=" * 50)
+        logger.info("🤖 Starting Telegram Bot...")
+        logger.info("=" * 50)
+        
+        # Create application
+        application = Application.builder().token(BOT_TOKEN).build()
+        
+        # Add handlers
+        application.add_handler(CommandHandler("start", start))
+        application.add_handler(CallbackQueryHandler(button_handler))
+        application.add_handler(MessageHandler(filters.CONTACT, handle_contact))
+        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
+        application.add_error_handler(error_handler)
+        
+        logger.info("✅ Bot handlers registered successfully")
+        logger.info("🔄 Starting polling...")
+        
+        # Start polling (this blocks)
+        application.run_polling(
+            drop_pending_updates=True,
+            allowed_updates=['message', 'callback_query', 'contact']
+        )
+        
+        logger.info("⏹️ Bot polling stopped")
+        
+    except Exception as e:
+        logger.error(f"❌ Bot error: {e}")
+        logger.exception("Full traceback:")
+    finally:
+        release_lock(lock_fd)
 
 # ==================== MAIN ENTRY POINT ====================
 if __name__ == '__main__':
