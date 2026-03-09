@@ -1,9 +1,6 @@
 ```dockerfile
 FROM node:18-alpine
 
-# Create app directory
-WORKDIR /usr/src/app
-
 # Copy package files
 COPY package*.json ./
 
@@ -12,9 +9,6 @@ RUN npm ci --only=production
 
 # Copy app source
 COPY . .
-
-# Create volume for database
-VOLUME [ "/usr/src/app/data" ]
 
 # Expose port
 EXPOSE 3000
