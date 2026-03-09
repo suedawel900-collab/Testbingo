@@ -1,11 +1,13 @@
 #!/bin/bash
-# start.sh - Run both web and bot processes
-
 echo "========================================="
 echo "Starting MK BINGO - Web + Bot"
 echo "========================================="
 echo "Web server will run on port $PORT"
 echo "Bot will run in background"
+
+# Kill any existing bot processes
+pkill -f "python bot.py" 2>/dev/null || true
+sleep 2
 
 # Start the bot in the background
 python bot.py &
