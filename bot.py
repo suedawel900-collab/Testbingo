@@ -9,7 +9,6 @@ import time
 import logging
 import sqlite3
 import json
-import asyncio
 from datetime import datetime
 from typing import Optional, Dict, Any
 
@@ -27,12 +26,15 @@ RAILWAY_URL = os.environ.get('RAILWAY_STATIC_URL', 'localhost:5000')
 APP_URL = f"https://{RAILWAY_URL}"
 
 if not BOT_TOKEN:
-    logger.error("BOT_TOKEN environment variable not set!")
+    logger.error("❌ BOT_TOKEN environment variable not set!")
     sys.exit(1)
 
-logger.info(f"Starting bot process with BOT_TOKEN: {BOT_TOKEN[:5]}...")
-logger.info(f"APP_URL: {APP_URL}")
-logger.info(f"ADMIN_ID: {ADMIN_ID}")
+logger.info("=" * 50)
+logger.info(f"🚀 Starting MK BINGO Bot Process")
+logger.info(f"🤖 Bot Token: {BOT_TOKEN[:5]}...")
+logger.info(f"🌐 App URL: {APP_URL}")
+logger.info(f"👑 Admin ID: {ADMIN_ID}")
+logger.info("=" * 50)
 
 # ==================== DATABASE FUNCTIONS ====================
 def get_db_connection():
@@ -73,7 +75,7 @@ def create_user(telegram_id: int, username: str, first_name: str) -> None:
     )
     conn.commit()
     conn.close()
-    logger.info(f"Created user: {first_name} (ID: {telegram_id})")
+    logger.info(f"✅ Created user: {first_name} (ID: {telegram_id})")
 
 def update_user_phone(telegram_id: int, phone_number: str) -> None:
     """Update user's phone number"""
@@ -85,7 +87,7 @@ def update_user_phone(telegram_id: int, phone_number: str) -> None:
     )
     conn.commit()
     conn.close()
-    logger.info(f"Updated phone for user {telegram_id}: {phone_number}")
+    logger.info(f"📱 Updated phone for user {telegram_id}")
 
 def add_transaction(user_id: int, amount: int, tx_id: str) -> None:
     """Add new deposit transaction"""
@@ -98,7 +100,7 @@ def add_transaction(user_id: int, amount: int, tx_id: str) -> None:
     )
     conn.commit()
     conn.close()
-    logger.info(f"Added transaction: {tx_id} for user {user_id}")
+    logger.info(f"💰 Added transaction: {tx_id} for {amount} ETB")
 
 def approve_transaction(tx_id: str, admin_id: int) -> tuple:
     """Approve transaction and update user balance"""
@@ -128,7 +130,7 @@ def approve_transaction(tx_id: str, admin_id: int) -> tuple:
     
     conn.commit()
     conn.close()
-    logger.info(f"Approved transaction {tx_id} for {amount} ETB")
+    logger.info(f"✅ Approved transaction {tx_id} for {amount} ETB")
     return telegram_id, amount
 
 def get_pending_transactions_count() -> int:
@@ -148,13 +150,14 @@ from telegram.error import Conflict, TimedOut, NetworkError
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /start command"""
     user = update.effective_user
-    logger.info(f"Start command from {user.first_name} (ID: {user.id})")
+    logger.info(f"📨 Start command from {user.first_name} (ID: {user.id})")
     
     db_user = get_user(user.id)
     if not db_user:
         create_user(user.id, user.username, user.first_name)
         db_user = get_user(user.id)
     
+    # Check if phone number exists
     if db_user and not db_user['phone_number']:
         contact_keyboard = [
             [KeyboardButton("📱 Share Phone Number", request_contact=True)],
@@ -174,6 +177,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     is_admin = db_user and db_user['is_admin']
     
+    # Create main menu
     keyboard = [
         [InlineKeyboardButton("🎮 PLAY BINGO", web_app={"url": f"{APP_URL}/game?user={user.id}"})],
         [
@@ -187,11 +191,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard.append([InlineKeyboardButton("👑 ADMIN PANEL", web_app={"url": f"{APP_URL}/admin?user={user.id}"})])
     
     balance = db_user['balance'] if db_user else 1000
+    pending = get_pending_transactions_count()
     
     await update.message.reply_text(
         f"🎰 Welcome to MK BINGO, {user.first_name}!\n"
         f"💰 Balance: {balance} ETB\n"
-        f"📊 Pending: {get_pending_transactions_count()} transactions",
+        f"📊 Pending: {pending} transactions",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
@@ -372,13 +377,13 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle errors"""
-    logger.error(f"Update {update} caused error {context.error}")
+    logger.error(f"❌ Update {update} caused error {context.error}")
 
 # ==================== MAIN BOT FUNCTION ====================
 def run_bot():
-    """Run the bot with proper error handling and auto-restart"""
+    """Run the bot with proper error handling"""
     logger.info("=" * 50)
-    logger.info("Starting MK BINGO Telegram Bot")
+    logger.info("🤖 Starting Telegram Bot...")
     logger.info("=" * 50)
     
     retry_count = 0
@@ -386,85 +391,57 @@ def run_bot():
     
     while retry_count < max_retries:
         try:
+            # Create application
             application = Application.builder().token(BOT_TOKEN).build()
             
+            # Add handlers
             application.add_handler(CommandHandler("start", start))
             application.add_handler(CallbackQueryHandler(button_handler))
             application.add_handler(MessageHandler(filters.CONTACT, handle_contact))
             application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
             application.add_error_handler(error_handler)
             
-            logger.info("Bot handlers registered successfully")
-            logger.info("Starting polling...")
+            logger.info("✅ Bot handlers registered successfully")
+            logger.info("🔄 Starting polling...")
             
+            # Start polling (this blocks)
             application.run_polling(
                 drop_pending_updates=True,
-                allowed_updates=['message', 'callback_query', 'contact'],
-                close_loop=False
+                allowed_updates=['message', 'callback_query', 'contact']
             )
             
-            logger.info("Bot polling stopped normally")
+            # If we get here, polling stopped
+            logger.info("⏹️ Bot polling stopped")
             break
             
         except Conflict as e:
-            logger.error(f"Conflict error: {e}")
-            logger.info("Waiting 10 seconds before retry...")
-            time.sleep(10)
+            logger.error(f"⚠️ Conflict error: {e}")
             retry_count += 1
+            if retry_count < max_retries:
+                wait = 10
+                logger.info(f"⏱️ Waiting {wait} seconds before retry...")
+                time.sleep(wait)
             
         except Exception as e:
-            logger.error(f"Unexpected error: {e}")
+            logger.error(f"❌ Unexpected error: {e}")
             logger.exception("Full traceback:")
-            logger.info("Waiting 15 seconds before retry...")
-            time.sleep(15)
             retry_count += 1
+            if retry_count < max_retries:
+                wait = 15
+                logger.info(f"⏱️ Waiting {wait} seconds before retry...")
+                time.sleep(wait)
     
     if retry_count >= max_retries:
-        logger.error("Max retries reached. Bot failed to start.")
+        logger.error("❌ Max retries reached. Bot failed to start.")
         sys.exit(1)
-
-# ==================== HEALTH CHECK ====================
-def check_environment():
-    """Check if all required environment variables are set"""
-    missing = []
-    
-    if not BOT_TOKEN:
-        missing.append("BOT_TOKEN")
-    if not ADMIN_ID:
-        missing.append("ADMIN_ID")
-    
-    if missing:
-        logger.error(f"Missing environment variables: {', '.join(missing)}")
-        return False
-    
-    try:
-        conn = get_db_connection()
-        conn.close()
-        logger.info("Database connection successful")
-    except Exception as e:
-        logger.error(f"Database connection failed: {e}")
-        return False
-    
-    return True
 
 # ==================== MAIN ENTRY POINT ====================
 if __name__ == '__main__':
-    logger.info("=" * 50)
-    logger.info("MK BINGO Bot Process Starting")
-    logger.info("=" * 50)
-    
-    if not check_environment():
-        logger.error("Environment check failed. Exiting.")
+    try:
+        run_bot()
+    except KeyboardInterrupt:
+        logger.info("⏹️ Bot stopped by user")
+        sys.exit(0)
+    except Exception as e:
+        logger.error(f"❌ Fatal error: {e}")
         sys.exit(1)
-    
-    while True:
-        try:
-            run_bot()
-        except KeyboardInterrupt:
-            logger.info("Bot stopped by user")
-            sys.exit(0)
-        except Exception as e:
-            logger.error(f"Bot crashed: {e}")
-            logger.exception("Full traceback:")
-            logger.info("Restarting in 10 seconds...")
-            time.sleep(10)
