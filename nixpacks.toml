@@ -1,0 +1,29 @@
+# nixpacks.toml - Complete configuration for Node.js Bingo Bot
+
+# Node.js provider configuration
+[phases.setup]
+nixPkgs = ["nodejs_20", "sqlite"]
+
+[phases.install]
+cmds = ["npm ci --only=production"]
+
+[phases.build]
+cmds = ["echo 'Build complete'"]
+
+# Start command
+[start]
+cmd = "node index.js"
+
+# Environment variables
+[environment]
+NODE_ENV = "production"
+PORT = "3000"
+DB_PATH = "/app/data/bingo.db"
+
+# Cache configuration
+[cache]
+install = ["/usr/src/app/node_modules"]
+
+# Build-time environment variables
+[build.env]
+NIXPACKS_NODE_VERSION = "20"
