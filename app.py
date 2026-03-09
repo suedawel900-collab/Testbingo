@@ -36,7 +36,7 @@ def init_db():
     """Initialize database tables"""
     os.makedirs('database', exist_ok=True)
     
-    conn = sqlite3.connect('database/bingo.db')
+    conn = sqlite3.connect('database/bingo.db', check_same_thread=False)
     c = conn.cursor()
     
     # Users table
@@ -257,124 +257,6 @@ def get_user_cards(user_id):
     conn.close()
     return cards
 
-# ==================== BOT SETUP ====================
-def run_bot():
-    """Run Telegram bot in a separate thread"""
-    import asyncio
-    from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
-    from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler, ContextTypes
-    
-    if not BOT_TOKEN:
-        logger.error("No BOT_TOKEN")
-        return
-    
-    logger.info(f"Starting bot in thread...")
-    
-    # Create event loop for this thread
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    
-    async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle /start command"""
-        user = update.effective_user
-        logger.info(f"Start command from {user.first_name} (ID: {user.id})")
-        
-        # Check if user exists in database
-        db_user = get_user(user.id)
-        if not db_user:
-            create_user(user.id, user.username, user.first_name)
-            db_user = get_user(user.id)
-        
-        # Check if user is admin
-        is_admin = db_user and db_user['is_admin']
-        
-        # Create main menu
-        keyboard = [
-            [InlineKeyboardButton("🎮 PLAY BINGO", web_app={"url": f"{APP_URL}/game?user={user.id}"})],
-            [
-                InlineKeyboardButton("💰 DEPOSIT", callback_data="deposit"),
-                InlineKeyboardButton("📊 STATS", callback_data="stats")
-            ],
-            [InlineKeyboardButton("💳 BALANCE", callback_data="balance")]
-        ]
-        
-        if is_admin:
-            keyboard.append([InlineKeyboardButton("👑 ADMIN PANEL", web_app={"url": f"{APP_URL}/admin?user={user.id}"})])
-        
-        balance = db_user['balance'] if db_user else 1000
-        
-        await update.message.reply_text(
-            f"🎰 Welcome to MK BINGO, {user.first_name}!\n"
-            f"💰 Balance: {balance} ETB",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
-    
-    async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle button callbacks"""
-        query = update.callback_query
-        await query.answer()
-        
-        data = query.data
-        user = query.from_user
-        
-        if data == "balance":
-            db_user = get_user(user.id)
-            if db_user:
-                await query.edit_message_text(
-                    f"💳 *Your Balance*\n\n"
-                    f"Available: *{db_user['balance']} ETB*",
-                    parse_mode='Markdown'
-                )
-        
-        elif data == "stats":
-            db_user = get_user(user.id)
-            if db_user:
-                await query.edit_message_text(
-                    f"📊 *Your Stats*\n\n"
-                    f"Games Played: *{db_user['games_played']}*\n"
-                    f"Wins: *{db_user['wins']} ETB*",
-                    parse_mode='Markdown'
-                )
-        
-        elif data == "deposit":
-            await query.edit_message_text(
-                "💰 *Deposit Instructions*\n\n"
-                "1. Send money via Telebirr to:\n"
-                "   📱 +251 91 234 5678\n"
-                "2. Send your transaction ID here",
-                parse_mode='Markdown'
-            )
-            context.user_data['awaiting_deposit'] = True
-    
-    async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle text messages"""
-        if context.user_data.get('awaiting_deposit'):
-            await update.message.reply_text("✅ Deposit request received! Admin will verify.")
-            context.user_data.clear()
-    
-    # Create application
-    application = Application.builder().token(BOT_TOKEN).build()
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CallbackQueryHandler(button_handler))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
-    
-    logger.info("Bot started polling...")
-    
-    try:
-        application.run_polling(drop_pending_updates=True)
-    except Exception as e:
-        logger.error(f"Bot error: {e}")
-    finally:
-        loop.close()
-
-# Start bot in thread
-if BOT_TOKEN:
-    bot_thread = threading.Thread(target=run_bot, daemon=True)
-    bot_thread.start()
-    logger.info("Bot thread started")
-else:
-    logger.error("BOT_TOKEN not set!")
-
 # ==================== FLASK ROUTES ====================
 
 @application.route('/')
@@ -486,7 +368,7 @@ def purchase_cards():
     c.execute("SELECT session_id FROM game_sessions WHERE status = 'waiting' ORDER BY id DESC LIMIT 1")
     session = c.fetchone()
     
-    settings = get_game_settings()
+    settings = {'card_price': 10, 'min_cards_to_start': 10, 'game_type': 'full house', 'house_fee': 5}
     
     if not session:
         session_id = str(uuid.uuid4())[:8]
@@ -541,7 +423,7 @@ def purchase_cards():
         'session_id': session_id,
         'total_cards_sold': updated[0],
         'total_players': updated[1],
-        'game_ready': updated[0] >= settings['min_cards_to_start']
+        'game_ready': updated[0] >= 10
     })
 
 @application.route('/health')
@@ -552,6 +434,62 @@ def health():
         'url': APP_URL
     })
 
+# ==================== BOT SETUP - RUN IN MAIN THREAD ====================
+def run_bot():
+    """Run Telegram bot in the main thread"""
+    from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+    from telegram.ext import Application, CommandHandler, ContextTypes
+    
+    if not BOT_TOKEN:
+        logger.error("No BOT_TOKEN")
+        return
+    
+    logger.info(f"Starting bot in main thread...")
+    
+    async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /start command"""
+        user = update.effective_user
+        logger.info(f"Start command from {user.first_name} (ID: {user.id})")
+        
+        # Check if user exists
+        db_user = get_user(user.id)
+        if not db_user:
+            create_user(user.id, user.username, user.first_name)
+            db_user = get_user(user.id)
+        
+        # Check if admin
+        is_admin = db_user and db_user['is_admin']
+        
+        # Create menu
+        keyboard = [
+            [InlineKeyboardButton("🎮 PLAY BINGO", web_app={"url": f"{APP_URL}/game?user={user.id}"})]
+        ]
+        
+        if is_admin:
+            keyboard.append([InlineKeyboardButton("👑 ADMIN PANEL", web_app={"url": f"{APP_URL}/admin?user={user.id}"})])
+        
+        balance = db_user['balance'] if db_user else 1000
+        
+        await update.message.reply_text(
+            f"🎰 Welcome to MK BINGO, {user.first_name}!\n💰 Balance: {balance} ETB",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    
+    # Create application
+    application = Application.builder().token(BOT_TOKEN).build()
+    application.add_handler(CommandHandler("start", start))
+    
+    logger.info("Bot started polling...")
+    application.run_polling(drop_pending_updates=True)
+
+# ==================== MAIN ====================
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    application.run(host='0.0.0.0', port=port)
+    # Check if we should run bot or flask
+    import sys
+    if len(sys.argv) > 1 and sys.argv[1] == 'bot':
+        # Run just the bot
+        run_bot()
+    else:
+        # Run Flask (bot will be run in a separate process)
+        port = int(os.environ.get('PORT', 5000))
+        application.run(host='0.0.0.0', port=port)
