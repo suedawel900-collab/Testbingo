@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
 MK BINGO - Telegram Bot Process
-This file runs the Telegram bot in a separate process to avoid threading issues.
 """
 
 import os
@@ -106,13 +105,11 @@ def approve_transaction(tx_id: str, admin_id: int) -> tuple:
     conn = get_db_connection()
     c = conn.cursor()
     
-    # Update transaction status
     c.execute(
         "UPDATE transactions SET status = 'approved', approved_by = ?, approved_at = ? WHERE tx_id = ?",
         (admin_id, datetime.now(), tx_id)
     )
     
-    # Get user_id and amount
     c.execute("SELECT user_id, amount FROM transactions WHERE tx_id = ?", (tx_id,))
     result = c.fetchone()
     if not result:
@@ -121,13 +118,11 @@ def approve_transaction(tx_id: str, admin_id: int) -> tuple:
     
     user_id, amount = result
     
-    # Update user balance
     c.execute(
         "UPDATE users SET balance = balance + ?, total_deposits = total_deposits + ? WHERE id = ?",
         (amount, amount, user_id)
     )
     
-    # Get telegram_id
     c.execute("SELECT telegram_id FROM users WHERE id = ?", (user_id,))
     telegram_id = c.fetchone()[0]
     
@@ -145,32 +140,6 @@ def get_pending_transactions_count() -> int:
     conn.close()
     return count
 
-def get_game_settings() -> Dict[str, Any]:
-    """Get current game settings"""
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute(
-        "SELECT game_type, card_price, min_cards_to_start, call_interval, house_fee FROM game_settings ORDER BY updated_at DESC LIMIT 1"
-    )
-    settings = c.fetchone()
-    conn.close()
-    
-    if settings:
-        return {
-            'game_type': settings[0],
-            'card_price': settings[1],
-            'min_cards_to_start': settings[2],
-            'call_interval': settings[3],
-            'house_fee': settings[4]
-        }
-    return {
-        'game_type': 'full house',
-        'card_price': 10,
-        'min_cards_to_start': 10,
-        'call_interval': 3,
-        'house_fee': 5
-    }
-
 # ==================== TELEGRAM BOT HANDLERS ====================
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler, ContextTypes
@@ -181,15 +150,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     logger.info(f"Start command from {user.first_name} (ID: {user.id})")
     
-    # Check if user exists
     db_user = get_user(user.id)
     if not db_user:
         create_user(user.id, user.username, user.first_name)
         db_user = get_user(user.id)
     
-    # Check if phone number exists
     if db_user and not db_user['phone_number']:
-        # Ask for phone number
         contact_keyboard = [
             [KeyboardButton("📱 Share Phone Number", request_contact=True)],
             [KeyboardButton("❌ Skip")]
@@ -206,10 +172,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
     
-    # Check if user is admin
     is_admin = db_user and db_user['is_admin']
     
-    # Create main menu
     keyboard = [
         [InlineKeyboardButton("🎮 PLAY BINGO", web_app={"url": f"{APP_URL}/game?user={user.id}"})],
         [
@@ -219,7 +183,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("💳 BALANCE", callback_data="balance")]
     ]
     
-    # Add admin button if user is admin
     if is_admin:
         keyboard.append([InlineKeyboardButton("👑 ADMIN PANEL", web_app={"url": f"{APP_URL}/admin?user={user.id}"})])
     
@@ -238,12 +201,9 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     
     if contact and contact.user_id == user.id:
-        # Save phone number
         update_user_phone(user.id, contact.phone_number)
-        
         await update.message.reply_text("✅ Phone number saved!")
         
-        # Show main menu
         db_user = get_user(user.id)
         is_admin = db_user and db_user['is_admin']
         
@@ -307,7 +267,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data['awaiting_amount'] = True
     
     elif data.startswith("approve_"):
-        # Admin approval
         if user.id != ADMIN_ID:
             await query.edit_message_text("❌ Unauthorized")
             return
@@ -316,7 +275,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         telegram_id, amount = approve_transaction(tx_id, ADMIN_ID)
         
         if telegram_id:
-            # Notify user
             await context.bot.send_message(
                 telegram_id,
                 f"✅ *Deposit Approved!*\n\n"
@@ -346,7 +304,6 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     text = update.message.text.strip()
     
-    # Step 1: User enters amount
     if context.user_data.get('awaiting_amount'):
         try:
             amount = int(text)
@@ -368,7 +325,6 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except ValueError:
             await update.message.reply_text("❌ Please enter a valid number")
     
-    # Step 2: User enters transaction ID
     elif context.user_data.get('awaiting_tx'):
         tx_id = text.upper()
         amount = context.user_data.get('deposit_amount')
@@ -383,10 +339,8 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ User not found. Please use /start")
             return
         
-        # Save transaction
         add_transaction(db_user['id'], amount, tx_id)
         
-        # Notify admin
         keyboard = [[
             InlineKeyboardButton("✅ Approve", callback_data=f"approve_{tx_id}"),
             InlineKeyboardButton("❌ Reject", callback_data=f"reject_{tx_id}")
@@ -432,10 +386,8 @@ def run_bot():
     
     while retry_count < max_retries:
         try:
-            # Create application
             application = Application.builder().token(BOT_TOKEN).build()
             
-            # Add handlers
             application.add_handler(CommandHandler("start", start))
             application.add_handler(CallbackQueryHandler(button_handler))
             application.add_handler(MessageHandler(filters.CONTACT, handle_contact))
@@ -445,31 +397,17 @@ def run_bot():
             logger.info("Bot handlers registered successfully")
             logger.info("Starting polling...")
             
-            # Start polling (this blocks)
             application.run_polling(
                 drop_pending_updates=True,
                 allowed_updates=['message', 'callback_query', 'contact'],
                 close_loop=False
             )
             
-            # If we get here, polling stopped normally
             logger.info("Bot polling stopped normally")
             break
             
         except Conflict as e:
             logger.error(f"Conflict error: {e}")
-            logger.info("Waiting 10 seconds before retry...")
-            time.sleep(10)
-            retry_count += 1
-            
-        except TimedOut as e:
-            logger.error(f"Timeout error: {e}")
-            logger.info("Waiting 5 seconds before retry...")
-            time.sleep(5)
-            retry_count += 1
-            
-        except NetworkError as e:
-            logger.error(f"Network error: {e}")
             logger.info("Waiting 10 seconds before retry...")
             time.sleep(10)
             retry_count += 1
@@ -494,14 +432,11 @@ def check_environment():
         missing.append("BOT_TOKEN")
     if not ADMIN_ID:
         missing.append("ADMIN_ID")
-    if not RAILWAY_URL:
-        missing.append("RAILWAY_URL")
     
     if missing:
         logger.error(f"Missing environment variables: {', '.join(missing)}")
         return False
     
-    # Check database connection
     try:
         conn = get_db_connection()
         conn.close()
@@ -518,12 +453,10 @@ if __name__ == '__main__':
     logger.info("MK BINGO Bot Process Starting")
     logger.info("=" * 50)
     
-    # Check environment
     if not check_environment():
         logger.error("Environment check failed. Exiting.")
         sys.exit(1)
     
-    # Run bot with auto-restart
     while True:
         try:
             run_bot()
