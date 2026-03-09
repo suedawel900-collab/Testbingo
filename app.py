@@ -1,6 +1,5 @@
 import os
 import sqlite3
-import threading
 import logging
 import time
 import json
@@ -324,6 +323,24 @@ def get_game_settings():
         'house_fee': 5
     }
 
+def get_pending_transactions_count():
+    """Get count of pending transactions"""
+    conn = sqlite3.connect('database/bingo.db')
+    c = conn.cursor()
+    c.execute("SELECT COUNT(*) FROM transactions WHERE status = 'pending'")
+    count = c.fetchone()[0]
+    conn.close()
+    return count
+
+def get_all_purchased_cards():
+    """Get all purchased cards for card status"""
+    conn = sqlite3.connect('database/bingo.db')
+    c = conn.cursor()
+    c.execute("SELECT card_number, user_id FROM purchased_cards WHERE status = 'active'")
+    cards = {row[0]: row[1] for row in c.fetchall()}
+    conn.close()
+    return cards
+
 # ==================== FLASK ROUTES ====================
 
 @application.route('/')
@@ -370,7 +387,7 @@ def get_user_data(telegram_id):
 def get_card_status():
     """Get status of all cards - handles 'guest' user"""
     user_id = request.args.get('user_id', 'guest')
-    cards = get_purchased_cards()
+    cards = get_all_purchased_cards()
     
     my_cards = []
     if user_id != 'guest':
@@ -423,6 +440,7 @@ def get_game_session():
         'status': 'no_session'
     })
 
+# ==================== FIXED PURCHASE ENDPOINT ====================
 @application.route('/api/game/purchase', methods=['POST'])
 def purchase_cards():
     """Purchase cards and join game - handles 'guest' user"""
@@ -438,6 +456,15 @@ def purchase_cards():
     
     cards = data.get('cards', [])
     total_price = data.get('total_price', 0)
+    
+    # Validate cards
+    if not cards:
+        return jsonify({'success': False, 'error': 'No cards selected'}), 400
+    
+    # Validate card numbers
+    for card in cards:
+        if not isinstance(card, int) or card < 1 or card > 1000:
+            return jsonify({'success': False, 'error': f'Invalid card number: {card}'}), 400
     
     user = get_user(user_id)
     if not user:
@@ -465,7 +492,7 @@ def purchase_cards():
     else:
         session_id = session[0]
     
-    # Check if cards are available
+    # Check if cards are available in this session
     purchased = get_purchased_cards(session_id)
     conflicts = [c for c in cards if c in purchased]
     
@@ -496,20 +523,18 @@ def purchase_cards():
                  WHERE session_id = ?''',
               (len(cards), session_id))
     
-    # Get updated session info
-    c.execute("SELECT total_cards_sold, total_players FROM game_sessions WHERE session_id = ?", (session_id,))
-    updated = c.fetchone()
-    
     conn.commit()
     conn.close()
+    
+    logger.info(f"User {user_id} purchased {len(cards)} cards in session {session_id}")
     
     return jsonify({
         'success': True,
         'new_balance': new_balance,
         'session_id': session_id,
-        'total_cards_sold': updated[0],
-        'total_players': updated[1],
-        'game_ready': updated[0] >= settings['min_cards_to_start']
+        'cards_purchased': len(cards),
+        'total_cards_sold': len(cards) + (session[1] if session else 0),
+        'total_players': 1
     })
 
 @application.route('/health')
@@ -517,7 +542,8 @@ def health():
     return jsonify({
         'status': 'ok',
         'bot_token_configured': bool(BOT_TOKEN),
-        'url': APP_URL
+        'url': APP_URL,
+        'admin_id': ADMIN_ID
     })
 
 if __name__ == '__main__':
