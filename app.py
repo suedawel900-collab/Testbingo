@@ -31,7 +31,6 @@ logger.info(f"APP_URL: {APP_URL}")
 logger.info(f"ADMIN_ID: {ADMIN_ID}")
 
 # ==================== DATABASE CONNECTION ====================
-# Use a timeout and WAL mode to prevent locking
 def get_db():
     """Get database connection with proper settings"""
     conn = sqlite3.connect('database/bingo.db', timeout=30)
@@ -39,26 +38,25 @@ def get_db():
     # Enable WAL mode for better concurrency
     conn.execute('PRAGMA journal_mode=WAL')
     conn.execute('PRAGMA synchronous=NORMAL')
+    conn.execute('PRAGMA busy_timeout=30000')
     return conn
 
 def db_transaction(func):
     """Decorator to handle database transactions with commit/rollback"""
     @wraps(func)
     def wrapper(*args, **kwargs):
-        conn = None
+        conn = get_db()
         try:
-            conn = get_db()
+            # Pass conn as first argument
             result = func(conn, *args, **kwargs)
             conn.commit()
             return result
         except Exception as e:
-            if conn:
-                conn.rollback()
-            logger.error(f"Database error: {e}")
+            conn.rollback()
+            logger.error(f"Database error in {func.__name__}: {e}")
             raise
         finally:
-            if conn:
-                conn.close()
+            conn.close()
     return wrapper
 
 # ==================== DATABASE SETUP ====================
@@ -67,9 +65,6 @@ def init_db():
     os.makedirs('database', exist_ok=True)
     conn = get_db()
     c = conn.cursor()
-    
-    # Enable WAL mode
-    c.execute('PRAGMA journal_mode=WAL')
     
     # Users table
     c.execute('''CREATE TABLE IF NOT EXISTS users
@@ -156,29 +151,6 @@ def init_db():
                   FOREIGN KEY (user_id) REFERENCES users(id),
                   FOREIGN KEY (session_id) REFERENCES game_sessions(session_id))''')
     
-    # Admin logs table
-    c.execute('''CREATE TABLE IF NOT EXISTS admin_logs
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                  admin_id INTEGER,
-                  action TEXT,
-                  details TEXT,
-                  ip_address TEXT,
-                  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                  FOREIGN KEY (admin_id) REFERENCES users(id))''')
-    
-    # House fee history table
-    c.execute('''CREATE TABLE IF NOT EXISTS house_fee_history
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                  session_id TEXT,
-                  total_cards INTEGER,
-                  card_price INTEGER,
-                  total_prize INTEGER,
-                  fee_percentage REAL,
-                  house_amount INTEGER,
-                  players_prize INTEGER,
-                  winner_count INTEGER,
-                  game_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
-    
     conn.commit()
     conn.close()
     logger.info("Database initialized successfully")
@@ -229,7 +201,7 @@ def safe_int(value, default=None):
 
 @db_transaction
 def get_user(conn, telegram_id):
-    """Get user by telegram ID - SAFE version that handles non-integers"""
+    """Get user by telegram ID - decorated version"""
     if telegram_id == 'guest' or telegram_id is None:
         return None
     
@@ -257,14 +229,50 @@ def get_user(conn, telegram_id):
         }
     return None
 
+# Non-decorated version for simple calls
+def get_user_simple(telegram_id):
+    """Simple version without decorator"""
+    conn = get_db()
+    try:
+        if telegram_id == 'guest' or telegram_id is None:
+            return None
+        
+        user_id = safe_int(telegram_id)
+        if user_id is None:
+            return None
+        
+        c = conn.cursor()
+        c.execute("SELECT * FROM users WHERE telegram_id = ?", (user_id,))
+        user = c.fetchone()
+        
+        if user:
+            return {
+                'id': user[0],
+                'telegram_id': user[1],
+                'username': user[2],
+                'first_name': user[3],
+                'balance': user[4],
+                'games_played': user[5],
+                'wins': user[6],
+                'total_deposits': user[7],
+                'phone_number': user[8],
+                'is_admin': user[9],
+                'created_at': user[10]
+            }
+        return None
+    finally:
+        conn.close()
+
 def create_user(telegram_id, username, first_name):
     """Create new user"""
     conn = get_db()
-    c = conn.cursor()
-    c.execute("INSERT OR IGNORE INTO users (telegram_id, username, first_name) VALUES (?, ?, ?)",
-              (telegram_id, username, first_name))
-    conn.commit()
-    conn.close()
+    try:
+        c = conn.cursor()
+        c.execute("INSERT OR IGNORE INTO users (telegram_id, username, first_name) VALUES (?, ?, ?)",
+                  (telegram_id, username, first_name))
+        conn.commit()
+    finally:
+        conn.close()
 
 @db_transaction
 def update_balance(conn, telegram_id, amount, operation='add'):
@@ -326,44 +334,49 @@ def get_user_cards(conn, user_id):
 def get_game_settings():
     """Get current game settings"""
     conn = get_db()
-    c = conn.cursor()
-    c.execute("SELECT game_type, card_price, min_cards_to_start, call_interval, house_fee FROM game_settings ORDER BY updated_at DESC LIMIT 1")
-    settings = c.fetchone()
-    conn.close()
-    
-    if settings:
+    try:
+        c = conn.cursor()
+        c.execute("SELECT game_type, card_price, min_cards_to_start, call_interval, house_fee FROM game_settings ORDER BY updated_at DESC LIMIT 1")
+        settings = c.fetchone()
+        
+        if settings:
+            return {
+                'game_type': settings[0],
+                'card_price': settings[1],
+                'min_cards_to_start': settings[2],
+                'call_interval': settings[3],
+                'house_fee': settings[4]
+            }
         return {
-            'game_type': settings[0],
-            'card_price': settings[1],
-            'min_cards_to_start': settings[2],
-            'call_interval': settings[3],
-            'house_fee': settings[4]
+            'game_type': 'full house',
+            'card_price': 10,
+            'min_cards_to_start': 10,
+            'call_interval': 3,
+            'house_fee': 5
         }
-    return {
-        'game_type': 'full house',
-        'card_price': 10,
-        'min_cards_to_start': 10,
-        'call_interval': 3,
-        'house_fee': 5
-    }
+    finally:
+        conn.close()
 
 def get_pending_transactions_count():
     """Get count of pending transactions"""
     conn = get_db()
-    c = conn.cursor()
-    c.execute("SELECT COUNT(*) FROM transactions WHERE status = 'pending'")
-    count = c.fetchone()[0]
-    conn.close()
-    return count
+    try:
+        c = conn.cursor()
+        c.execute("SELECT COUNT(*) FROM transactions WHERE status = 'pending'")
+        return c.fetchone()[0]
+    finally:
+        conn.close()
 
 def get_all_purchased_cards():
     """Get all purchased cards for card status"""
     conn = get_db()
-    c = conn.cursor()
-    c.execute("SELECT card_number, user_id FROM purchased_cards WHERE status = 'active'")
-    cards = {row[0]: row[1] for row in c.fetchall()}
-    conn.close()
-    return cards
+    try:
+        c = conn.cursor()
+        c.execute("SELECT card_number, user_id FROM purchased_cards WHERE status = 'active'")
+        cards = {row[0]: row[1] for row in c.fetchall()}
+        return cards
+    finally:
+        conn.close()
 
 # ==================== FLASK ROUTES ====================
 
@@ -377,7 +390,7 @@ def game():
     balance = 1000
     
     if user_id != 'guest':
-        user = get_user(None, user_id)  # Pass None as conn, will create new connection
+        user = get_user_simple(user_id)
         if user:
             balance = user['balance']
     
@@ -395,7 +408,7 @@ def get_user_data(telegram_id):
             'is_admin': False
         })
     
-    user = get_user(None, telegram_id)
+    user = get_user_simple(telegram_id)
     if user:
         return jsonify({
             'success': True,
@@ -415,9 +428,9 @@ def get_card_status():
     
     my_cards = []
     if user_id != 'guest':
-        user = get_user(None, user_id)
+        user = get_user_simple(user_id)
         if user:
-            my_cards = get_user_cards(None, user['id'])
+            my_cards = get_user_cards(None, user['id'])  # Will use decorator
     
     return jsonify({
         'success': True,
@@ -430,39 +443,40 @@ def get_card_status():
 def get_game_session():
     """Get current game session"""
     conn = get_db()
-    c = conn.cursor()
-    
-    c.execute("SELECT session_id, total_cards_sold, total_players, card_price, status FROM game_sessions WHERE status = 'waiting' ORDER BY id DESC LIMIT 1")
-    session = c.fetchone()
-    
-    if session:
-        prize_pool = session[1] * session[3]
+    try:
+        c = conn.cursor()
         
-        c.execute('''SELECT u.telegram_id, u.first_name, p.cards_bought 
-                     FROM game_participants p
-                     JOIN users u ON p.user_id = u.id
-                     WHERE p.session_id = ?''', (session[0],))
-        players = [{'id': row[0], 'name': row[1], 'cards': row[2]} for row in c.fetchall()]
+        c.execute("SELECT session_id, total_cards_sold, total_players, card_price, status FROM game_sessions WHERE status = 'waiting' ORDER BY id DESC LIMIT 1")
+        session = c.fetchone()
         
-        conn.close()
+        if session:
+            prize_pool = session[1] * session[3]
+            
+            c.execute('''SELECT u.telegram_id, u.first_name, p.cards_bought 
+                         FROM game_participants p
+                         JOIN users u ON p.user_id = u.id
+                         WHERE p.session_id = ?''', (session[0],))
+            players = [{'id': row[0], 'name': row[1], 'cards': row[2]} for row in c.fetchall()]
+            
+            return jsonify({
+                'success': True,
+                'session_id': session[0],
+                'total_cards_sold': session[1],
+                'total_players': session[2],
+                'prize_pool': prize_pool,
+                'status': session[4],
+                'players': players
+            })
+        
         return jsonify({
             'success': True,
-            'session_id': session[0],
-            'total_cards_sold': session[1],
-            'total_players': session[2],
-            'prize_pool': prize_pool,
-            'status': session[4],
-            'players': players
+            'total_cards_sold': 0,
+            'total_players': 0,
+            'prize_pool': 0,
+            'status': 'no_session'
         })
-    
-    conn.close()
-    return jsonify({
-        'success': True,
-        'total_cards_sold': 0,
-        'total_players': 0,
-        'prize_pool': 0,
-        'status': 'no_session'
-    })
+    finally:
+        conn.close()
 
 # ==================== FIXED PURCHASE ENDPOINT ====================
 @application.route('/api/game/purchase', methods=['POST'])
@@ -490,7 +504,7 @@ def purchase_cards():
         if not isinstance(card, int) or card < 1 or card > 1000:
             return jsonify({'success': False, 'error': f'Invalid card number: {card}'}), 400
     
-    user = get_user(None, user_id)
+    user = get_user_simple(user_id)
     if not user:
         return jsonify({'success': False, 'error': 'User not found'}), 404
     
@@ -522,7 +536,6 @@ def purchase_cards():
         conflicts = [c for c in cards if c in purchased]
         
         if conflicts:
-            conn.close()
             return jsonify({
                 'success': False,
                 'error': 'Some cards already purchased',
