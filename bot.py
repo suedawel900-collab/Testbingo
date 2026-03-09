@@ -85,7 +85,7 @@ def db_transaction(func):
     def wrapper(*args, **kwargs):
         conn = get_db_connection()
         try:
-            # Pass conn as first argument
+            # Pass conn as first argument, then the rest of the args
             result = func(conn, *args, **kwargs)
             conn.commit()
             return result
@@ -278,6 +278,7 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     
     if contact and contact.user_id == user.id:
+        # Use None as first argument to create new connection
         update_user_phone(None, user.id, contact.phone_number)
         await update.message.reply_text("✅ Phone number saved!")
         
